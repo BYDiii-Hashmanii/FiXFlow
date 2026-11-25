@@ -1,0 +1,391 @@
+@use 'styles/variables' as *;
+@use 'styles/mixins' as *;
+
+:root {
+  // Brand colors
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-primary-active: #1e40af;
+  --color-primary-light: #eff6ff;
+  --color-primary-border: #bfdbfe;
+
+  // Neutral colors
+  --color-page-bg: #f4f6fa;
+  --color-card-bg: #ffffff;
+  --color-border: #e2e8f0;
+  --color-border-subtle: #f1f5f9;
+
+  // Text colors
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-text-placeholder: #94a3b8;
+  --color-text-inverse: #ffffff;
+
+  // Status colors
+  --status-green-bg: #dcfce7;
+  --status-green-text: #15803d;
+  --status-green-border: #bbf7d0;
+
+  --status-orange-bg: #fff3e0;
+  --status-orange-text: #c2410c;
+  --status-orange-border: #fed7aa;
+
+  --status-grey-bg: #f1f5f9;
+  --status-grey-text: #475569;
+  --status-grey-border: #cbd5e1;
+
+  --status-red-bg: #fee2e2;
+  --status-red-text: #b91c1c;
+  --status-red-border: #fca5a5;
+
+  --status-blue-bg: #e0f2fe;
+  --status-blue-text: #0369a1;
+  --status-blue-border: #bae6fd;
+
+  // Radii
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  // Shadows
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 2px 8px rgba(15, 23, 42, 0.04);
+  --shadow-card-hover: 0 6px 16px rgba(15, 23, 42, 0.08);
+  --shadow-dropdown: 0 10px 25px -5px rgba(15, 23, 42, 0.1), 0 8px 10px -6px rgba(15, 23, 42, 0.05);
+  --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+
+  // Transitions
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+// Reset & Base
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--color-text-primary);
+  background-color: var(--color-page-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+// Typography
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  color: var(--color-text-primary);
+  line-height: 1.25;
+}
+
+h1 { font-size: clamp(1.4rem, 2.5vw, 1.85rem); }
+h2 { font-size: clamp(1.2rem, 2vw, 1.5rem); }
+h3 { font-size: 1.15rem; }
+h4 { font-size: 1rem; }
+
+p {
+  color: var(--color-text-secondary);
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+// Global Chip / Status badge classes
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.775rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+
+  &.chip-green {
+    background-color: var(--status-green-bg);
+    color: var(--status-green-text);
+  }
+
+  &.chip-orange {
+    background-color: var(--status-orange-bg);
+    color: var(--status-orange-text);
+  }
+
+  &.chip-grey {
+    background-color: var(--status-grey-bg);
+    color: var(--status-grey-text);
+  }
+
+  &.chip-red {
+    background-color: var(--status-red-bg);
+    color: var(--status-red-text);
+  }
+
+  &.chip-blue {
+    background-color: var(--status-blue-bg);
+    color: var(--status-blue-text);
+  }
+}
+
+// Common Button classes matching PDF
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  border-radius: var(--radius-md);
+  font-size: 0.95rem;
+  font-weight: 600;
+  min-height: 46px;
+  text-align: center;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
+  text-decoration: none;
+  outline: none;
+
+  &:focus-visible {
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+  }
+
+  &:active {
+    transform: scale(0.99);
+  }
+
+  &.btn-primary {
+    background-color: var(--color-primary);
+    color: var(--color-text-inverse);
+    border: 1px solid var(--color-primary);
+
+    &:hover {
+      background-color: var(--color-primary-hover);
+      border-color: var(--color-primary-hover);
+      text-decoration: none;
+    }
+
+    &:disabled {
+      background-color: #93c5fd;
+      border-color: #93c5fd;
+      cursor: not-allowed;
+      transform: none;
+    }
+  }
+
+  &.btn-secondary {
+    background-color: #ffffff;
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+
+    &:hover {
+      background-color: #f8fafc;
+      border-color: #cbd5e1;
+      text-decoration: none;
+    }
+  }
+
+  &.btn-outline-primary {
+    background-color: transparent;
+    color: var(--color-primary);
+    border: 1.5px solid var(--color-primary);
+
+    &:hover {
+      background-color: var(--color-primary-light);
+      text-decoration: none;
+    }
+  }
+
+  &.btn-danger {
+    background-color: #dc2626;
+    color: #ffffff;
+    border: 1px solid #dc2626;
+
+    &:hover {
+      background-color: #b91c1c;
+      border-color: #b91c1c;
+    }
+  }
+
+  &.btn-block {
+    width: 100%;
+  }
+
+  &.btn-sm {
+    min-height: 36px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    border-radius: var(--radius-sm);
+  }
+}
+
+// Global Form Controls matching PDF
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+
+  label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  .form-control {
+    width: 100%;
+    height: 46px;
+    padding: 10px 14px;
+    background-color: #ffffff;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    color: var(--color-text-primary);
+    font-size: 0.95rem;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+
+    &::placeholder {
+      color: var(--color-text-placeholder);
+    }
+
+    &:focus {
+      outline: none;
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+
+    &.is-invalid {
+      border-color: #ef4444;
+      &:focus {
+        box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+      }
+    }
+
+    &[readonly], &:disabled {
+      background-color: #f8fafc;
+      color: #64748b;
+      cursor: default;
+    }
+  }
+
+  textarea.form-control {
+    height: auto;
+    min-height: 88px;
+    resize: vertical;
+  }
+
+  .form-error {
+    font-size: 0.8rem;
+    color: #ef4444;
+  }
+
+  .form-hint {
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+  }
+}
+
+// Common Card surface
+.card {
+  background-color: var(--color-card-bg);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+  transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
+
+  @include desktop {
+    padding: 20px;
+  }
+}
+
+// Modal Backdrop & Container
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadeIn 0.2s ease-out;
+
+  @include mobile {
+    align-items: flex-end;
+    padding: 0;
+  }
+}
+
+.modal-content {
+  background-color: #ffffff;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-modal);
+  width: 100%;
+  max-width: 440px;
+  overflow: hidden;
+  animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+
+  @include mobile {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    max-width: 100%;
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+// Safe area support for notch
+.safe-padding-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}

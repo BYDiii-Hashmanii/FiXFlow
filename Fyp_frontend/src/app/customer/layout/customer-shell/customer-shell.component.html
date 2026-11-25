@@ -1,0 +1,168 @@
+@if (isAuthPage) {
+  <main class="customer-auth-viewport">
+    <router-outlet></router-outlet>
+  </main>
+} @else {
+  <div class="customer-layout">
+    <!-- Desktop Left Sidebar (>= 1024px) -->
+    <aside class="desktop-sidebar" aria-label="Customer Navigation">
+      <div class="sidebar-brand">
+        <div class="brand-logo">
+          <app-icon name="wrench" size="lg"></app-icon>
+        </div>
+        <div class="brand-info">
+          <span class="brand-name">FixFlow</span>
+          <span class="brand-badge">Customer</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a routerLink="/customer/home" routerLinkActive="active" class="nav-item">
+          <app-icon name="home"></app-icon>
+          <span>Home</span>
+        </a>
+        <a routerLink="/customer/requests" routerLinkActive="active" class="nav-item">
+          <app-icon name="briefcase"></app-icon>
+          <span>My Requests</span>
+        </a>
+        <a routerLink="/customer/notifications" routerLinkActive="active" class="nav-item">
+          <div class="icon-with-badge">
+            <app-icon name="bell"></app-icon>
+            @if (unreadCount > 0) {
+              <span class="badge-dot">{{ unreadCount }}</span>
+            }
+          </div>
+          <span>Notifications</span>
+        </a>
+        <a routerLink="/customer/profile" routerLinkActive="active" class="nav-item">
+          <app-icon name="user"></app-icon>
+          <span>Profile</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-preview">
+          <div class="user-avatar">{{ authService.currentUser()?.avatarInitials }}</div>
+          <div class="user-details">
+            <span class="user-name">{{ authService.currentUser()?.fullName }}</span>
+            <span class="user-role">Customer</span>
+          </div>
+        </div>
+        <div class="sidebar-footer-links">
+          <a routerLink="/technician/dashboard" class="btn-switch-role" title="Switch to Technician Portal">
+            <app-icon name="wrench" size="sm"></app-icon>
+            <span>Technician Portal</span>
+          </a>
+          <a routerLink="/" class="btn-portal-home" title="Back to Portal Selection">
+            <app-icon name="home" size="sm"></app-icon>
+            <span>Choose Role</span>
+          </a>
+        </div>
+        <button type="button" class="btn-logout" (click)="authService.openLogoutModal()" title="Log out">
+          <app-icon name="logout" size="sm"></app-icon>
+          <span>Logout</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="customer-main-area">
+      <!-- Desktop Top Header (>= 1024px) -->
+      <header class="desktop-topbar">
+        <div class="topbar-title">
+          <h2>{{ headerService.config().title }}</h2>
+        </div>
+        <div class="topbar-actions">
+          <!-- Notification Bell -->
+          <a routerLink="/customer/notifications" class="topbar-icon-btn" aria-label="Notifications">
+            <app-icon name="bell"></app-icon>
+            @if (unreadCount > 0) {
+              <span class="badge-dot">{{ unreadCount }}</span>
+            }
+          </a>
+
+          <!-- Profile Pill -->
+          <a routerLink="/customer/profile" class="topbar-user-pill">
+            <div class="pill-avatar">{{ authService.currentUser()?.avatarInitials }}</div>
+            <div class="pill-info">
+              <span class="pill-name">{{ authService.currentUser()?.fullName }}</span>
+              <span class="pill-role">Customer</span>
+            </div>
+          </a>
+        </div>
+      </header>
+
+      <!-- Mobile Sticky Top Header (< 1024px) -->
+      <header class="mobile-topbar">
+        <div class="mobile-header-left">
+          @if (headerService.config().showBack) {
+            <button type="button" class="btn-back" (click)="goBack()" aria-label="Go back">
+              <app-icon name="arrow-left" size="md"></app-icon>
+            </button>
+          } @else {
+            <div class="mobile-brand-title">FixFlow</div>
+          }
+        </div>
+        <div class="mobile-header-center">
+          @if (headerService.config().showBack) {
+            <h2 class="mobile-page-title">{{ headerService.config().title }}</h2>
+          }
+        </div>
+        <div class="mobile-header-right">
+          @if (headerService.config().showBell) {
+            <a routerLink="/customer/notifications" class="mobile-bell-btn" aria-label="Notifications">
+              <app-icon name="bell"></app-icon>
+              @if (unreadCount > 0) {
+                <span class="badge-dot">{{ unreadCount }}</span>
+              }
+            </a>
+          }
+        </div>
+      </header>
+
+      <!-- Main Router Outlet Container -->
+      <main class="customer-page-content" [class.with-bottom-nav]="!isAuthPage">
+        <div class="content-wrapper">
+          <router-outlet></router-outlet>
+        </div>
+      </main>
+
+      <!-- Mobile Bottom Navigation (PDF layout: Home, My Requests, Notifications, Profile) -->
+      <nav class="mobile-bottom-nav" aria-label="Customer Navigation">
+        <a routerLink="/customer/home" routerLinkActive="active" class="bottom-nav-item">
+          <app-icon name="home"></app-icon>
+          <span>Home</span>
+        </a>
+        <a routerLink="/customer/requests" routerLinkActive="active" class="bottom-nav-item">
+          <app-icon name="briefcase"></app-icon>
+          <span>My Requests</span>
+        </a>
+        <a routerLink="/customer/notifications" routerLinkActive="active" class="bottom-nav-item">
+          <div class="icon-wrap-badge">
+            <app-icon name="bell"></app-icon>
+            @if (unreadCount > 0) {
+              <span class="nav-badge-dot"></span>
+            }
+          </div>
+          <span>Notifications</span>
+        </a>
+        <a routerLink="/customer/profile" routerLinkActive="active" class="bottom-nav-item">
+          <app-icon name="user"></app-icon>
+          <span>Profile</span>
+        </a>
+      </nav>
+    </div>
+  </div>
+}
+
+<!-- Screen 28: Logout Confirm Modal -->
+@if (authService.showLogoutModal()) {
+  <app-confirm-modal
+    [isOpen]="true"
+    title="Log out"
+    message="Are you sure you want to log out?"
+    confirmText="Logout"
+    cancelText="Cancel"
+    (confirm)="authService.confirmLogout()"
+    (cancelled)="authService.closeLogoutModal()"
+  ></app-confirm-modal>
+}

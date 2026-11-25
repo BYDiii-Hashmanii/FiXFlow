@@ -1,0 +1,191 @@
+@if (isAuthPage) {
+  <main class="auth-viewport">
+    <router-outlet></router-outlet>
+  </main>
+} @else {
+  <div class="app-layout">
+    <!-- Desktop Left Sidebar -->
+    <aside class="desktop-sidebar" aria-label="Main Navigation">
+      <div class="sidebar-brand">
+        <div class="brand-logo">
+          <app-icon name="wrench" size="lg"></app-icon>
+        </div>
+        <div class="brand-info">
+          <span class="brand-name">FixFlow</span>
+          <span class="brand-badge">Technician</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a routerLink="/technician/dashboard" routerLinkActive="active" class="nav-item">
+          <app-icon name="home"></app-icon>
+          <span>Dashboard</span>
+        </a>
+        <a routerLink="/technician/jobs" routerLinkActive="active" class="nav-item">
+          <app-icon name="briefcase"></app-icon>
+          <span>My Jobs</span>
+        </a>
+        <a routerLink="/technician/schedule" routerLinkActive="active" class="nav-item">
+          <app-icon name="calendar"></app-icon>
+          <span>Schedule</span>
+        </a>
+        <a routerLink="/technician/notifications" routerLinkActive="active" class="nav-item">
+          <div class="icon-with-badge">
+            <app-icon name="bell"></app-icon>
+            @if (dataService.unreadNotificationsCount() > 0) {
+              <span class="badge-dot">{{ dataService.unreadNotificationsCount() }}</span>
+            }
+          </div>
+          <span>Notifications</span>
+        </a>
+        <a routerLink="/technician/profile" routerLinkActive="active" class="nav-item">
+          <app-icon name="user"></app-icon>
+          <span>Profile</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-preview">
+          <div class="user-avatar">{{ dataService.technician()?.initials }}</div>
+          <div class="user-details">
+            <span class="user-name">{{ dataService.technician()?.name }}</span>
+            <span class="user-company">{{ dataService.technician()?.company }}</span>
+          </div>
+        </div>
+        <div class="sidebar-footer-links">
+          <a routerLink="/customer/home" class="btn-switch-role" title="Switch to Customer Portal">
+            <app-icon name="user" size="sm"></app-icon>
+            <span>Customer Portal</span>
+          </a>
+          <a routerLink="/" class="btn-portal-home" title="Back to Portal Selection">
+            <app-icon name="home" size="sm"></app-icon>
+            <span>Choose Role</span>
+          </a>
+        </div>
+        <button type="button" class="btn-logout" (click)="authService.openLogoutModal()" title="Log out">
+          <app-icon name="logout" size="sm"></app-icon>
+          <span>Logout</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="app-main-area">
+      <!-- Desktop Top Header -->
+      <header class="desktop-topbar">
+        <div class="topbar-title">
+          <h2>{{ headerService.config().title }}</h2>
+        </div>
+        <div class="topbar-actions">
+          <!-- Availability Switch -->
+          <button
+            type="button"
+            class="status-toggle-pill"
+            [class.status-online]="dataService.technician()?.isAvailable"
+            (click)="toggleOnline()"
+            title="Click to toggle availability"
+          >
+            <span class="status-indicator"></span>
+            <span class="status-label">{{ dataService.technician()?.isAvailable ? 'Available now' : 'Offline' }}</span>
+          </button>
+
+          <!-- Notification Bell -->
+          <a routerLink="/technician/notifications" class="topbar-icon-btn" aria-label="Notifications">
+            <app-icon name="bell"></app-icon>
+            @if (dataService.unreadNotificationsCount() > 0) {
+              <span class="badge-dot">{{ dataService.unreadNotificationsCount() }}</span>
+            }
+          </a>
+
+          <!-- Profile Pill -->
+          <a routerLink="/technician/profile" class="topbar-user-pill">
+            <div class="pill-avatar">{{ dataService.technician()?.initials }}</div>
+            <div class="pill-info">
+              <span class="pill-name">{{ dataService.technician()?.name }}</span>
+              <span class="pill-role">Technician</span>
+            </div>
+          </a>
+        </div>
+      </header>
+
+      <!-- Mobile Sticky Top Header -->
+      <header class="mobile-topbar">
+        <div class="mobile-header-left">
+          @if (headerService.config().showBack) {
+            <button type="button" class="btn-back" (click)="goBack()" aria-label="Go back">
+              <app-icon name="arrow-left" size="md"></app-icon>
+            </button>
+          } @else {
+            <div class="mobile-brand-title">FixFlow</div>
+          }
+        </div>
+        <div class="mobile-header-center">
+          @if (headerService.config().showBack) {
+            <h2 class="mobile-page-title">{{ headerService.config().title }}</h2>
+          }
+        </div>
+        <div class="mobile-header-right">
+          @if (headerService.config().showBell) {
+            <a routerLink="/technician/notifications" class="mobile-bell-btn" aria-label="Notifications">
+              <app-icon name="bell"></app-icon>
+              @if (dataService.unreadNotificationsCount() > 0) {
+                <span class="badge-dot">{{ dataService.unreadNotificationsCount() }}</span>
+              }
+            </a>
+          }
+        </div>
+      </header>
+
+      <!-- Main Router Outlet Container -->
+      <main class="page-content" [class.with-mobile-nav]="!isAuthPage">
+        <div class="content-wrapper">
+          @if (dataService.failure()) {
+        <div role="alert" class="card"><p>{{ dataService.failure() }}</p>
+          @if (dataService.retry(); as retry) { <button class="btn btn-secondary" (click)="retry()">Try again</button> }
+        </div>
+      }
+      <router-outlet></router-outlet>
+        </div>
+      </main>
+
+      <!-- Mobile Bottom Navigation Bar (PDF layout) -->
+      <nav class="mobile-bottom-nav" aria-label="Mobile Navigation">
+        <a routerLink="/technician/dashboard" routerLinkActive="active" class="bottom-nav-item">
+          <app-icon name="home"></app-icon>
+          <span>Home</span>
+        </a>
+        <a routerLink="/technician/jobs" routerLinkActive="active" class="bottom-nav-item">
+          <app-icon name="briefcase"></app-icon>
+          <span>My Jobs</span>
+        </a>
+        <a routerLink="/technician/schedule" routerLinkActive="active" class="bottom-nav-item">
+          <app-icon name="calendar"></app-icon>
+          <span>Schedule</span>
+        </a>
+        <a routerLink="/technician/profile" routerLinkActive="active" class="bottom-nav-item">
+          <app-icon name="user"></app-icon>
+          <span>Profile</span>
+        </a>
+      </nav>
+    </div>
+  </div>
+}
+
+<!-- Screen 20 / 28: Global Logout Confirmation Modal -->
+@if (authService.showLogoutModal()) {
+  <div class="modal-backdrop" (click)="authService.closeLogoutModal()">
+    <div class="modal-content logout-dialog" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
+      <div class="logout-dialog-body">
+        <h3 class="logout-title">Log out</h3>
+        <p class="logout-desc">Are you sure you want to log out?</p>
+        <div class="logout-actions">
+          <button type="button" class="btn btn-secondary logout-btn" (click)="authService.closeLogoutModal()">
+            Cancel
+          </button>
+          <button type="button" class="btn btn-primary logout-btn" (click)="authService.confirmLogout()">
+            Logout
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+}

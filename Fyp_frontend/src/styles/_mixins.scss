@@ -1,0 +1,63 @@
+@use 'variables' as *;
+
+// Breakpoint mixins
+@mixin mobile {
+  @media (max-width: #{$bp-mobile}) {
+    @content;
+  }
+}
+
+@mixin tablet {
+  @media (min-width: #{$bp-tablet-min}) and (max-width: #{$bp-tablet-max}) {
+    @content;
+  }
+}
+
+@mixin desktop {
+  @media (min-width: #{$bp-desktop-min}) {
+    @content;
+  }
+}
+
+@mixin tablet-up {
+  @media (min-width: #{$bp-tablet-min}) {
+    @content;
+  }
+}
+
+@mixin mobile-tablet {
+  @media (max-width: #{$bp-tablet-max}) {
+    @content;
+  }
+}
+
+@mixin respond-to($breakpoint) {
+  @if $breakpoint == 'mobile' {
+    @include mobile { @content; }
+  } @else if $breakpoint == 'tablet' {
+    @include tablet { @content; }
+  } @else if $breakpoint == 'desktop' {
+    @include desktop { @content; }
+  } @else if $breakpoint == 'tablet-up' {
+    @include tablet-up { @content; }
+  } @else if $breakpoint == 'mobile-tablet' {
+    @include mobile-tablet { @content; }
+  }
+}
+
+// Touch target accessibility
+@mixin touch-target {
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+// Card styling mixin
+@mixin card-surface {
+  background: var(--color-card-bg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  border: 1px solid var(--color-border);
+}

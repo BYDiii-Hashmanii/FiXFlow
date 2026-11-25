@@ -1,0 +1,160 @@
+@if (isAuthPage) {
+  <main class="owner-auth-viewport">
+    <router-outlet></router-outlet>
+  </main>
+} @else {
+  <div class="owner-layout">
+    <!-- Desktop Left Sidebar (>= 1024px) -->
+    <aside class="desktop-sidebar" aria-label="Company Owner Navigation">
+      <div class="sidebar-brand">
+        <div class="brand-logo">
+          <app-icon name="wrench" size="lg"></app-icon>
+        </div>
+        <div class="brand-info">
+          <span class="brand-name">FixFlow</span>
+          <span class="brand-badge">Company Owner</span>
+        </div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <a routerLink="/owner/dashboard" routerLinkActive="active" class="nav-item">
+          <app-icon name="home"></app-icon>
+          <span>Home</span>
+        </a>
+        <a routerLink="/owner/technicians" routerLinkActive="active" class="nav-item">
+          <app-icon name="user"></app-icon>
+          <span>Technicians</span>
+        </a>
+        <a routerLink="/owner/jobs" routerLinkActive="active" class="nav-item">
+          <app-icon name="briefcase"></app-icon>
+          <span>Jobs</span>
+        </a>
+        <a routerLink="/owner/invoices" routerLinkActive="active" class="nav-item">
+          <app-icon name="file-text"></app-icon>
+          <span>Invoices</span>
+        </a>
+        <a routerLink="/owner/feedback" routerLinkActive="active" class="nav-item">
+          <app-icon name="star"></app-icon>
+          <span>Feedback</span>
+        </a>
+        <a routerLink="/owner/notifications" routerLinkActive="active" class="nav-item">
+          <div class="icon-with-badge">
+            <app-icon name="bell"></app-icon>
+            @if (unreadCount > 0) {
+              <span class="badge-dot">{{ unreadCount }}</span>
+            }
+          </div>
+          <span>Notifications</span>
+        </a>
+        <a routerLink="/owner/profile" routerLinkActive="active" class="nav-item">
+          <app-icon name="user"></app-icon>
+          <span>Profile</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="user-preview">
+          <div class="user-avatar">{{ authService.currentUser()?.avatarInitials }}</div>
+          <div class="user-details">
+            <span class="user-name">{{ authService.currentUser()?.fullName }}</span>
+            <span class="user-company">{{ authService.currentUser()?.company }}</span>
+          </div>
+        </div>
+
+        <button type="button" class="btn-logout" (click)="authService.openLogoutModal()" title="Log out">
+          <app-icon name="logout" size="sm"></app-icon>
+          <span>Logout</span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="owner-main-area">
+      <!-- Desktop Top Header (>= 1024px) -->
+      <header class="desktop-topbar">
+        <div class="topbar-title">
+          <h2>{{ headerService.config().title }}</h2>
+        </div>
+        <div class="topbar-actions">
+          <!-- Notification Bell -->
+          <a routerLink="/owner/notifications" class="topbar-icon-btn" aria-label="Notifications">
+            <app-icon name="bell"></app-icon>
+            @if (unreadCount > 0) {
+              <span class="badge-dot">{{ unreadCount }}</span>
+            }
+          </a>
+
+          <!-- Profile Pill -->
+          <a routerLink="/owner/profile" class="topbar-user-pill">
+            <div class="pill-avatar">{{ authService.currentUser()?.avatarInitials }}</div>
+            <div class="pill-info">
+              <span class="pill-name">{{ authService.currentUser()?.fullName }}</span>
+              <span class="pill-role">Company Owner</span>
+            </div>
+          </a>
+        </div>
+      </header>
+
+      <!-- Mobile Sticky Top Header (< 1024px) -->
+      <header class="mobile-topbar">
+        <div class="mobile-header-left">
+          @if (headerService.config().showBack) {
+            <button type="button" class="btn-back" (click)="goBack()" aria-label="Go back">
+              <app-icon name="arrow-left" size="md"></app-icon>
+            </button>
+          } @else {
+            <div class="mobile-brand-title">FixFlow</div>
+          }
+        </div>
+        <div class="mobile-header-center">
+          @if (headerService.config().showBack) {
+            <h2 class="mobile-page-title">{{ headerService.config().title }}</h2>
+          }
+        </div>
+        <div class="mobile-header-right">
+          <a routerLink="/owner/notifications" class="mobile-bell-btn" aria-label="Notifications">
+            <app-icon name="bell"></app-icon>
+            @if (unreadCount > 0) {
+              <span class="badge-dot">{{ unreadCount }}</span>
+            }
+          </a>
+        </div>
+      </header>
+
+      <!-- Main Content Outlet -->
+      <main class="owner-content">
+        <router-outlet></router-outlet>
+      </main>
+
+      <!-- Mobile Bottom Navigation Bar (< 1024px) -->
+      <nav class="mobile-bottom-nav" aria-label="Mobile Navigation">
+        <a routerLink="/owner/dashboard" routerLinkActive="active" class="bottom-nav-item">
+          <app-icon name="home"></app-icon>
+          <span>Home</span>
+        </a>
+        <a routerLink="/owner/technicians" routerLinkActive="active" class="bottom-nav-item">
+          <app-icon name="user"></app-icon>
+          <span>Technicians</span>
+        </a>
+        <a routerLink="/owner/jobs" routerLinkActive="active" class="bottom-nav-item">
+          <app-icon name="briefcase"></app-icon>
+          <span>Jobs</span>
+        </a>
+        <a routerLink="/owner/profile" routerLinkActive="active" class="bottom-nav-item">
+          <app-icon name="user"></app-icon>
+          <span>Profile</span>
+        </a>
+      </nav>
+    </div>
+  </div>
+}
+
+<!-- Logout Confirmation Modal (Screen 16 in PDF) -->
+<app-confirm-modal
+  [isOpen]="authService.showLogoutModal()"
+  title="Log out"
+  message="Are you sure you want to log out?"
+  confirmText="Logout"
+  cancelText="Cancel"
+  (confirm)="authService.confirmLogout()"
+  (cancelled)="authService.closeLogoutModal()"
+></app-confirm-modal>
