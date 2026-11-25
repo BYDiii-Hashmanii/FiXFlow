@@ -23,15 +23,14 @@ customer_only = require_role(m.UserRole.customer)
 def create_request(
     background: BackgroundTasks,
     categoryId: Annotated[int, Form(gt=0, le=2_147_483_647)],
-    description: Annotated[str, Form(min_length=1, max_length=2000)],
+    description: Annotated[str, Form(max_length=2000)] = "",
     accessTime: Annotated[str, Form(max_length=100)] = "",
     photo: UploadFile | None = File(None),
     user: m.User = Depends(customer_only),
     db: Session = Depends(get_db),
 ):
     req = RequestController(db).create_request(categoryId, description, accessTime, photo, user)
-    if req.photo_path:
-        background.add_task(analyze_request, db.get_bind(), req.id, req.photo_path)
+    background.add_task(analyze_request, db.get_bind(), req.id, req.photo_path)
     return ApiResponse.wrap(format_request_response(req))
 
 

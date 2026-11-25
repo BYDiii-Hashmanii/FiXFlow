@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Title } from '@angular/platform-browser';
@@ -182,8 +182,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
     } @else {
       <div class="card not-found-box">
         <app-icon name="alert-circle" size="lg"></app-icon>
-        <h2>Job Not Found</h2>
-        <p>Could not find the requested job record.</p>
+        <h2>{{ dataService.failure() ? 'Could not load job' : 'Loading job…' }}</h2>
         <a routerLink="/technician/jobs" class="btn btn-primary">Back to My Jobs</a>
       </div>
     }
@@ -574,6 +573,7 @@ export class JobDetailsComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   dataService = inject(DataService);
+  private readonly changeDetector = inject(ChangeDetectorRef);
   private headerService = inject(HeaderService);
   private title = inject(Title);
 
@@ -582,7 +582,10 @@ export class JobDetailsComponent implements OnInit {
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) return;
-    this.dataService.read(this.dataService.getJobById(id), job => { this.job = job; });
+    this.dataService.read(this.dataService.getJobById(id), job => {
+      this.job = job;
+      this.changeDetector.markForCheck();
+    });
 
     this.title.setTitle(`Job #${id}: ${this.job?.title || 'Details'} | FixFlow`);
     this.headerService.setHeader({

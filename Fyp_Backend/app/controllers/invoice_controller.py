@@ -6,6 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.controllers.lifecycle import now_utc
+from app.controllers.job_controller import format_photo
 from app.controllers.request_controller import format_technician_info
 from app.database import models as m
 
@@ -46,8 +47,9 @@ class InvoiceController:
             "totalCost": float(inv.total_amount),
             "status": inv.status.value,
             "workNotes": job.work_notes,
+            "photos": [format_photo(photo) for photo in job.photos if photo.photo_type in (m.PhotoType.before, m.PhotoType.after)],
             "createdAt": inv.created_at.isoformat(),
-            "paidAt": inv.payment.paid_at.isoformat() if inv.payment else None,
+            "paidAt": inv.payment.paid_at.replace(tzinfo=timezone.utc).isoformat() if inv.payment else None,
         }
 
     def receipt(self, invoice: m.Invoice) -> dict:
@@ -59,12 +61,11 @@ class InvoiceController:
         if invoice.status == m.InvoiceStatus.paid:
             return self.receipt(invoice)
         job = invoice.job
-        if invoice.status != m.InvoiceStatus.unpaid or job.status != m.JobStatus.completed:
+        if invoice.status != m.InvoiceStatus.unpaid:
             raise HTTPException(409, "Invoice is not payable")
         changed = self.db.execute(
             update(m.Invoice)
-            .where(m.Invoice.id == invoice.id, m.Invoice.status == m.InvoiceStatus.unpaid,
-                   m.Invoice.job.has(m.Job.status == m.JobStatus.completed))
+            .where(m.Invoice.id == invoice.id, m.Invoice.status == m.InvoiceStatus.unpaid)
             .values(status=m.InvoiceStatus.paid)
         )
         if changed.rowcount != 1:

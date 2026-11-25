@@ -8,7 +8,7 @@ import { IconComponent } from '../icon/icon.component';
   imports: [CommonModule, IconComponent],
   template: `
     @if (isOpen) {
-      <div class="modal-backdrop" (click)="onBackdropClick()">
+      <div class="modal-backdrop" [class.center-on-mobile]="centerOnMobile" (click)="onBackdropClick()">
         <div class="modal-dialog" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
           <div class="modal-body-content">
             @if (icon) {
@@ -63,6 +63,9 @@ import { IconComponent } from '../icon/icon.component';
       @include mobile {
         align-items: flex-end;
         padding: 0;
+
+        &.center-on-mobile { align-items: center; padding: 16px; }
+        &.center-on-mobile .modal-dialog { max-width: 420px; border-radius: var(--radius-xl); }
       }
     }
 
@@ -160,6 +163,7 @@ import { IconComponent } from '../icon/icon.component';
   `]
 })
 export class ConfirmModalComponent {
+  @Input() centerOnMobile = false;
   @Input() isOpen = false;
   @Input() title = 'Confirm Action';
   @Input() message = '';

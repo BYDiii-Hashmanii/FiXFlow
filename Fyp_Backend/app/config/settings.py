@@ -29,8 +29,9 @@ class Settings(BaseSettings):
     )
     OLLAMA_MODEL_NAME: str = "fixflow"
     PRELOAD_IMAGE_MODEL: bool = True
-    IMAGE_TIMEOUT_SECONDS: float = Field(default=12, gt=0, le=60)
+    IMAGE_TIMEOUT_SECONDS: float = Field(default=45, gt=0, le=60)
     CHAT_TIMEOUT_SECONDS: float = Field(default=15, gt=0, le=60)
+    GUIDANCE_TIMEOUT_SECONDS: float = Field(default=45, gt=0, le=120)
 
     @property
     def DATABASE_URL(self) -> str:

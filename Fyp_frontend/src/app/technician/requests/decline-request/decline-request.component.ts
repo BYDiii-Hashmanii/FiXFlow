@@ -1,5 +1,5 @@
 import { JobRequest } from '../../../core/models/request.model';
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -167,6 +167,7 @@ export class DeclineRequestComponent implements OnInit {
   private router = inject(Router);
   private fb = inject(FormBuilder);
   dataService = inject(DataService);
+  private readonly changeDetector = inject(ChangeDetectorRef);
   private headerService = inject(HeaderService);
   private title = inject(Title);
 
@@ -190,6 +191,7 @@ export class DeclineRequestComponent implements OnInit {
     if (this.requestId) this.dataService.read(this.dataService.getRequestById(this.requestId), request => {
       this.request = request;
       this.requestTitle = request.title;
+      this.changeDetector.markForCheck();
     });
 
     this.title.setTitle('Decline Request | FixFlow');

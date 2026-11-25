@@ -1,5 +1,8 @@
 import { ProtectedPhotoComponent } from '../../../shared/components/protected-photo.component';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { Subject, catchError, combineLatest, map, of, startWith, switchMap } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Title } from '@angular/platform-browser';
@@ -7,13 +10,16 @@ import { DataService } from '../../../core/services/data.service';
 import { HeaderService } from '../../../core/services/header.service';
 import { JobRequest } from '../../../core/models/request.model';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
+import { errorMessage } from '../../../core/interceptors/error.interceptor';
+
+type RequestState = { request?: JobRequest; loading?: boolean; unavailable?: boolean; error?: string };
 
 @Component({
   selector: 'app-incoming-request',
   standalone: true,
   imports: [ProtectedPhotoComponent, CommonModule, RouterLink, IconComponent],
   template: `
-    @if (request) {
+    @if (state().request; as request) {
       <div class="incoming-request-page">
         <!-- Desktop Breadcrumb / Back button -->
         <div class="page-top-nav">
@@ -112,12 +118,20 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
           </div>
         </div>
       </div>
-    } @else {
+    } @else if (state().loading) {
+      <div class="not-found-card card"><p role="status">Loading incoming request…</p></div>
+    } @else if (state().unavailable) {
       <div class="not-found-card card">
         <app-icon name="alert-circle" size="lg"></app-icon>
         <h2>Request Not Found</h2>
         <p>This request may have expired or already been assigned to another technician.</p>
         <a routerLink="/technician/dashboard" class="btn btn-primary">Return to Dashboard</a>
+      </div>
+    } @else {
+      <div class="not-found-card card">
+        <p role="alert">{{ state().error }}</p>
+        <button type="button" class="btn btn-primary" (click)="retry.next()">Try again</button>
+        <a routerLink="/technician/dashboard" class="btn btn-secondary">Return to Dashboard</a>
       </div>
     }
   `,
@@ -412,14 +426,28 @@ export class IncomingRequestComponent implements OnInit {
   private headerService = inject(HeaderService);
   private title = inject(Title);
 
-  request?: JobRequest;
+  readonly retry = new Subject<void>();
+  readonly state = toSignal<RequestState, RequestState>(
+    combineLatest([this.route.paramMap, this.retry.pipe(startWith(undefined))]).pipe(
+      switchMap(([params]) => {
+        const id = params.get('id');
+        if (!id) return of<RequestState>({ unavailable: true });
+        return this.dataService.getRequestById(id).pipe(
+          map((request): RequestState => ({ request })),
+          startWith<RequestState>({ loading: true }),
+          catchError((error: unknown) => of<RequestState>(
+            error instanceof HttpErrorResponse && error.status === 404
+              ? { unavailable: true }
+              : { error: errorMessage(error, 'Could not load the incoming request.') },
+          )),
+        );
+      }),
+    ),
+    { initialValue: { loading: true } },
+  );
 
   ngOnInit(): void {
-    const id = this.route.snapshot.paramMap.get('id');
-    if (!id) return;
-    this.dataService.read(this.dataService.getRequestById(id), request => { this.request = request; });
-
-    this.title.setTitle(`Incoming Request: ${this.request?.title || 'Job'} | FixFlow`);
+    this.title.setTitle('Incoming Request | FixFlow');
     this.headerService.setHeader({
       title: 'Incoming Request',
       showBack: true,
@@ -429,8 +457,8 @@ export class IncomingRequestComponent implements OnInit {
   }
 
   onAccept(): void {
-    if (this.request) {
-      const request = this.request;
+    const request = this.state().request;
+    if (request?.status === 'pending') {
       this.dataService.run(() => this.dataService.acceptRequest(request), () => {
         void this.router.navigate(['/technician/requests', request.id, 'accepted']);
       });

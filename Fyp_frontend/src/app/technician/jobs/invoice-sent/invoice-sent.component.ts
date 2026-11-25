@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Title } from '@angular/platform-browser';
@@ -165,6 +165,7 @@ export class InvoiceSentComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private router = inject(Router);
   dataService = inject(DataService);
+  private readonly changeDetector = inject(ChangeDetectorRef);
   private headerService = inject(HeaderService);
   private title = inject(Title);
 
@@ -173,7 +174,10 @@ export class InvoiceSentComponent implements OnInit {
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) return;
-    this.dataService.read(this.dataService.getJobById(id), job => { this.job = job; });
+    this.dataService.read(this.dataService.getJobById(id), job => {
+      this.job = job;
+      this.changeDetector.markForCheck();
+    });
 
     this.title.setTitle('Invoice Sent | FixFlow');
     this.headerService.setHeader({
@@ -187,6 +191,7 @@ export class InvoiceSentComponent implements OnInit {
     if (!this.job) return;
     this.dataService.read(this.dataService.getJobById(this.job.id), job => {
       this.job = job;
+      this.changeDetector.markForCheck();
       if (job.status === 'closed') void this.router.navigate(['/technician/jobs', job.id, 'closed']);
     });
   }

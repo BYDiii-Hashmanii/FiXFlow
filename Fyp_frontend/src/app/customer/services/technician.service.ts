@@ -7,8 +7,8 @@ import { TechnicianInfo } from '../models/customer.models';
 export class TechnicianService {
   private readonly api = inject(ApiClientService);
 
-  list(categoryId?: string | number) {
-    return this.api.get<TechnicianInfo[]>(API.technicians.list, { categoryId });
+  list(categoryId?: string | number, filters?: { available: boolean; bestMatch: boolean }) {
+    return this.api.get<TechnicianInfo[]>(API.technicians.list, { categoryId, ...filters });
   }
 
   autoSelect(requestId: string) {

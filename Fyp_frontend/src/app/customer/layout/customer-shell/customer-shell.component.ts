@@ -1,5 +1,5 @@
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet, RouterLink, RouterLinkActive, NavigationEnd } from '@angular/router';
 import { filter } from 'rxjs/operators';
@@ -30,6 +30,7 @@ export class CustomerShellComponent {
   router = inject(Router);
 
   isAuthPage = false;
+  readonly isWorkflowPage = signal(false);
 
   constructor() {
     this.checkCurrentRoute(this.router.url);
@@ -43,6 +44,7 @@ export class CustomerShellComponent {
 
   private checkCurrentRoute(url: string): void {
     const cleanUrl = url.split('?')[0];
+    this.isWorkflowPage.set(/^\/customer\/(report\/review|ai\/.+|booking\/.+|requests\/[^/]+\/track|invoices\/[^/]+)$/.test(cleanUrl));
     this.isAuthPage =
       cleanUrl === '/customer/splash' ||
       cleanUrl === '/customer/login' ||

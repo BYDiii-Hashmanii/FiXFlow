@@ -50,7 +50,16 @@ def add_list_indexes(conn) -> None:
         conn.exec_driver_sql(sql)
 
 
-MIGRATIONS = ((1, rebuild_with_checks), (2, add_analysis_state), (3, add_list_indexes))
+def add_analysis_progress(conn) -> None:
+    columns = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(service_requests)")}
+    for name, definition in {
+        "analysis_stage": "VARCHAR(16)", "vision_state": "VARCHAR(16)", "guidance_category": "VARCHAR(120)",
+    }.items():
+        if name not in columns:
+            conn.exec_driver_sql(f"ALTER TABLE service_requests ADD COLUMN {name} {definition}")
+
+
+MIGRATIONS = ((1, rebuild_with_checks), (2, add_analysis_state), (3, add_list_indexes), (4, add_analysis_progress))
 
 
 def migrate(database: Engine = engine) -> None:

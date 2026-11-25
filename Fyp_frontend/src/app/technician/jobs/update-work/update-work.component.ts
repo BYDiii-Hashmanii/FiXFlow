@@ -1,5 +1,5 @@
 import { ProtectedPhotoComponent } from '../../../shared/components/protected-photo.component';
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -554,6 +554,7 @@ export class UpdateWorkComponent implements OnInit {
   private router = inject(Router);
   private fb = inject(FormBuilder);
   dataService = inject(DataService);
+  private readonly changeDetector = inject(ChangeDetectorRef);
   private headerService = inject(HeaderService);
   private title = inject(Title);
 
@@ -580,7 +581,11 @@ export class UpdateWorkComponent implements OnInit {
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) return;
-    this.dataService.read(this.dataService.getJobById(id), job => { this.job = job; this.populateForm(job); });
+    this.dataService.read(this.dataService.getJobById(id), job => {
+      this.job = job;
+      this.populateForm(job);
+      this.changeDetector.markForCheck();
+    });
     {
       this.title.setTitle(`Update Work #${id} | FixFlow`);
       this.headerService.setHeader({
@@ -661,7 +666,10 @@ export class UpdateWorkComponent implements OnInit {
     const id = this.job?.id;
     input.value = '';
     if (image && id) {
-      this.dataService.run(() => this.dataService.uploadPhoto(id, type, image), job => { this.job = job; });
+      this.dataService.run(() => this.dataService.uploadPhoto(id, type, image), job => {
+        this.job = job;
+        this.changeDetector.markForCheck();
+      });
     }
   }
 
@@ -676,6 +684,7 @@ export class UpdateWorkComponent implements OnInit {
     this.dataService.run(() => this.dataService.updateJobWork(id, { expectedCompletion, workNotes, labourHours, parts }), job => {
       this.job = job;
       this.savedNotice = true;
+      this.changeDetector.markForCheck();
       if (proceed) void this.router.navigate(['/technician/jobs', id, 'complete']);
     });
   }

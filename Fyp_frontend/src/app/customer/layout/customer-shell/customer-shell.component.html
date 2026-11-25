@@ -98,12 +98,14 @@
             <button type="button" class="btn-back" (click)="goBack()" aria-label="Go back">
               <app-icon name="arrow-left" size="md"></app-icon>
             </button>
-          } @else {
+          } @else if (!isWorkflowPage()) {
             <div class="mobile-brand-title">FixFlow</div>
           }
         </div>
         <div class="mobile-header-center">
-          @if (headerService.config().showBack) {
+          @if (isWorkflowPage()) {
+            <h1 class="mobile-page-title">{{ headerService.config().title }}</h1>
+          } @else if (headerService.config().showBack) {
             <h2 class="mobile-page-title">{{ headerService.config().title }}</h2>
           }
         </div>
@@ -120,13 +122,14 @@
       </header>
 
       <!-- Main Router Outlet Container -->
-      <main class="customer-page-content" [class.with-bottom-nav]="!isAuthPage">
+      <main class="customer-page-content" [class.with-bottom-nav]="!isWorkflowPage()" [class.workflow-page]="isWorkflowPage()">
         <div class="content-wrapper">
           <router-outlet></router-outlet>
         </div>
       </main>
 
       <!-- Mobile Bottom Navigation (PDF layout: Home, My Requests, Notifications, Profile) -->
+      @if (!isWorkflowPage()) {
       <nav class="mobile-bottom-nav" aria-label="Customer Navigation">
         <a routerLink="/customer/home" routerLinkActive="active" class="bottom-nav-item">
           <app-icon name="home"></app-icon>
@@ -150,6 +153,7 @@
           <span>Profile</span>
         </a>
       </nav>
+      }
     </div>
   </div>
 }

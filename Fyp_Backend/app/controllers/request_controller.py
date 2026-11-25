@@ -1,8 +1,8 @@
 import logging
+from datetime import timezone
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.schemas.pagination import Pagination
@@ -14,7 +14,9 @@ from app.database import models as m
 from app.database.repositories.access import company_id, found
 from app.database.repositories.loading import request_loads
 from app.database.repositories.numbers import next_number
-from app.model_handle.inference import image_inference
+from app.database.repositories.technician_repository import by_best_match
+from app.model_handle.inference import chat_inference, image_inference
+from app.model_handle.llama_model.repair_guidance import generate_repair_guidance
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +44,11 @@ def format_analysis(req: m.ServiceRequest) -> dict:
     analysis = req.ai_analysis if req.analysis_state == "ready" else None
     return {
         "state": req.analysis_state, "provenance": req.analysis_source,
+        "stage": req.analysis_stage, "visionState": req.vision_state,
         "confidence": float(req.analysis_confidence) if req.analysis_confidence is not None else None,
         "detectorLabel": req.detector_label, "detectedCategory": req.detected_category,
         "title": analysis.problem_title if analysis else None,
-        "category": req.category.name,
+        "category": req.guidance_category or req.detected_category or req.category.name,
         "urgency": analysis.urgency.value if analysis else None,
         "summary": analysis.summary if analysis else None,
         "safetyNote": analysis.safety_note if analysis else None,
@@ -87,42 +90,65 @@ def analyze_file(path: Path) -> dict:
     return result
 
 
-async def analyze_request(bind, request_id: int, photo: str) -> None:
+async def analyze_request(bind, request_id: int, photo: str | None) -> None:
+    result = {}
+    vision = "skipped"
+    if photo:
+        try:
+            result = await image_inference.run(analyze_file, Path(photo), timeout=settings.IMAGE_TIMEOUT_SECONDS)
+            vision = "ready" if result.get("analysis") else "no_detection"
+        except Exception:
+            logger.warning("Image inference failed for request %s", request_id, exc_info=True)
+            vision = "failed"
     try:
-        result = await image_inference.run(analyze_file, Path(photo), timeout=settings.IMAGE_TIMEOUT_SECONDS)
-        state = "ready" if result.get("analysis") else "no_detection"
-    except Exception:
-        logger.warning("Image inference failed for request %s", request_id, exc_info=True)
-        result, state = {}, "failed"
-
-    try:
+        detected = result.get("analysis") or {}
         with Session(bind) as db:
             req = db.get(m.ServiceRequest, request_id)
             if req is None or req.analysis_state != "pending":
                 return
-            req.analysis_state = state
-            req.analysis_source = "yolo"
+            description, category = req.description, req.category.name
+            req.analysis_stage = "guidance"
+            req.vision_state = vision
             req.analysis_confidence = result.get("confidence")
             req.detector_label = result.get("primary_issue")
-            detected = result.get("analysis")
-            if detected:
-                req.detected_category = detected.get("category")
-                req.urgency = m.UrgencyLevel(detected["urgency"])
-                req.title = detected["title"]
-                db.add(m.AiAnalysis(
-                    request=req, problem_title=detected["title"], summary=detected["summary"],
-                    urgency=req.urgency, safety_note=detected["safety_note"],
-                    steps=[m.AiRepairStep(step_no=step["step_no"], instruction=step["instruction"])
-                           for step in detected["steps"]],
-                ))
+            req.detected_category = detected.get("category")
+            if not description and vision != "ready":
+                req.analysis_stage = "done"
+                req.analysis_state = vision
+                req.analysis_source = "yolo"
+                db.commit()
+                return
+            db.commit()
+
+        guidance = await chat_inference.run(
+            generate_repair_guidance, description or "", category,
+            {"label": result.get("primary_issue"), "category": detected.get("category"),
+             "confidence": result.get("confidence"), "state": vision},
+            timeout=settings.GUIDANCE_TIMEOUT_SECONDS,
+        )
+        with Session(bind) as db:
+            req = db.get(m.ServiceRequest, request_id)
+            if req is None or req.analysis_state != "pending":
+                return
+            req.analysis_state, req.analysis_stage = "ready", "done"
+            req.analysis_source = "yolo+llama" if vision == "ready" else "llama"
+            req.guidance_category = guidance.category
+            req.urgency = m.UrgencyLevel(guidance.urgency)
+            req.title = guidance.title
+            db.add(m.AiAnalysis(
+                request=req, problem_title=guidance.title, summary=guidance.summary,
+                urgency=req.urgency, safety_note=guidance.safety_note,
+                steps=[m.AiRepairStep(step_no=index, instruction=instruction)
+                       for index, instruction in enumerate(guidance.steps, 1)],
+            ))
             db.commit()
     except Exception:
-        logger.exception("Could not persist AI analysis for request %s", request_id)
+        logger.exception("Repair guidance failed for request %s", request_id)
         with Session(bind) as db:
             req = db.get(m.ServiceRequest, request_id)
             if req and req.analysis_state == "pending":
                 req.analysis_state = "failed"
-                req.analysis_source = "yolo"
+                req.analysis_stage = "done"
                 db.commit()
 
 
@@ -134,6 +160,9 @@ class RequestController:
         self, category_id: int, description: str, access_time: str,
         photo_file: UploadFile | None, user: m.User,
     ) -> m.ServiceRequest:
+        description = description.strip()
+        if not description and not photo_file:
+            raise HTTPException(422, "Add a photo or describe the problem")
         cat = found(self.db.query(m.ServiceCategory).filter_by(id=category_id), "Category")
         path = store_image(photo_file) if photo_file else None
         try:
@@ -141,7 +170,7 @@ class RequestController:
                 request_no=next_number(self.db, "request"), customer_id=user.id, category_id=cat.id,
                 title=cat.name, description=description, photo_path=str(path) if path else None,
                 address=user.address, access_time=access_time, status=m.RequestStatus.ai_analysis,
-                analysis_state="pending" if path else "no_detection",
+                analysis_state="pending", analysis_stage="image" if path else "guidance",
             )
             self.db.add(req)
             commit(self.db)
@@ -168,15 +197,13 @@ class RequestController:
         return [format_request_response(req, include_analysis=False) for req in page.apply(query)]
 
     def auto_select(self, req: m.ServiceRequest) -> dict:
-        rating = self.db.query(func.avg(m.Review.rating)).filter(
-            m.Review.technician_id == m.Technician.user_id
-        ).correlate(m.Technician).scalar_subquery()
-        tech = self.db.query(m.Technician).filter(
+        query = self.db.query(m.Technician).filter(
             m.Technician.category_id == req.category_id,
             m.Technician.user.has(m.User.is_active.is_(True)),
             m.Technician.availability == m.AvailabilityStatus.available,
             ~m.Technician.offers.any(m.RequestOffer.request_id == req.id),
-        ).order_by(rating.desc(), m.Technician.user_id).first()
+        )
+        tech = by_best_match(query).first()
         if not tech:
             raise HTTPException(404, "No available technician for this category")
         return format_technician_info(tech)
@@ -205,6 +232,9 @@ class RequestController:
             "requestId": req.request_no,
             "jobId": req.request_no if job else None,
             "title": req.title,
+            "category": req.category.name,
+            "accessTime": req.access_time,
+            "offeredPrice": float(offer.quoted_price) if offer else None,
             "status": status,
             "offerStatus": offer.status.value if offer else None,
             "previousTechnicianIds": [str(item.technician_id) for item in offers],
@@ -215,7 +245,7 @@ class RequestController:
             "invoiceEligible": bool(job and job.status == m.JobStatus.completed),
             "technician": format_technician_info(job.technician if job else offer.technician if offer else None),
             "timeline": {
-                key: when.isoformat() if when else None
+                key: when.replace(tzinfo=timezone.utc).isoformat() if when else None
                 for key, when in {
                     "sentAt": offer.sent_at if offer else None,
                     "respondedAt": offer.responded_at if offer else None,

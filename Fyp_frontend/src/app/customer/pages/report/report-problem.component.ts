@@ -1,6 +1,7 @@
 import { CategoryService } from '../../../core/services/category.service';
 import { ServiceCategory } from '../../models/customer.models';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -19,9 +20,12 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
         <!-- Category selection (matches Screen 5 in PDF) -->
         <div class="section-group">
           <label class="section-label">Problem category</label>
-          @if (categoryError) { <p role="alert">{{ categoryError }}</p> }
+          @if (categoryError()) {
+            <p role="alert">{{ categoryError() }}</p>
+            <button type="button" class="btn btn-secondary" (click)="loadCategories()">Try Again</button>
+          }
           <div class="category-chips-grid">
-            @for (cat of categories; track cat.id) {
+            @for (cat of categories(); track cat.id) {
               <button
                 type="button"
                 class="cat-chip"
@@ -50,9 +54,9 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
         <!-- Add Photo upload with camera/gallery (Screen 5) -->
         <div class="form-group photo-section">
           <label for="requestPhoto">Add a photo</label>
-          @if (photoError) { <p id="requestPhotoError" role="alert">{{ photoError }}</p> }
+          @if (photoError()) { <p id="requestPhotoError" role="alert">{{ photoError() }}</p> }
           <input
-            #fileInput id="requestPhoto" [attr.aria-describedby]="photoError ? 'requestPhotoError' : null"
+            #fileInput id="requestPhoto" [attr.aria-describedby]="photoError() ? 'requestPhotoError' : null"
             type="file"
             accept="image/*"
             capture="environment"
@@ -60,14 +64,14 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
             (change)="onFileSelected($event)"
           />
 
-          @if (!photoPreview) {
+          @if (!photoPreview()) {
             <button type="button" class="photo-upload-placeholder" (click)="fileInput.click()">
               <app-icon name="camera" size="md"></app-icon>
               <span>Take photo or choose from gallery</span>
             </button>
           } @else {
             <div class="photo-preview-box">
-              <img [src]="photoPreview" alt="Problem photo preview" class="preview-img" />
+              <img [src]="photoPreview()" alt="Problem photo preview" class="preview-img" />
               <button type="button" class="btn-remove-photo" aria-label="Remove selected photo" (click)="clearPhoto()">
                 <app-icon name="x" size="sm"></app-icon>
               </button>
@@ -90,7 +94,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
         <button
           type="submit"
           class="btn btn-primary btn-block btn-continue"
-          [disabled]="reportForm.invalid"
+          [disabled]="reportForm.invalid || (!selectedFile && !reportForm.get('description')?.value?.trim()) || (selectedFile && !photoPreview())"
         >
           Continue to AI Analysis
         </button>
@@ -234,15 +238,16 @@ export class ReportProblemComponent implements OnInit {
   private title = inject(Title);
 
   private categoryService = inject(CategoryService);
-  categories: ServiceCategory[] = [];
-  categoryError = "";
-  photoError = "";
-  photoPreview: string | null = null;
+  private readonly destroy = inject(DestroyRef);
+  readonly categories = signal<ServiceCategory[]>([]);
+  readonly categoryError = signal('');
+  readonly photoError = signal('');
+  readonly photoPreview = signal<string | null>(null);
   selectedFile: File | null = null;
 
   reportForm: FormGroup = this.fb.group({
     categoryId: ['', Validators.required],
-    description: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(2000)]],
+    description: ['', Validators.maxLength(2000)],
     accessTime: ['', Validators.maxLength(100)]
   });
 
@@ -255,10 +260,7 @@ export class ReportProblemComponent implements OnInit {
       showBell: false
     });
 
-    this.categoryService.list().subscribe({
-      next: categories => { this.categories = categories; },
-      error: () => { this.categoryError = "Could not load service categories."; },
-    });
+    this.loadCategories();
     const draft = this.reportService.draft();
     if (draft) {
       this.reportForm.patchValue({
@@ -266,9 +268,17 @@ export class ReportProblemComponent implements OnInit {
         description: draft.description,
         accessTime: draft.accessTime
       });
-      this.photoPreview = draft.photoPreview || null;
+      this.photoPreview.set(draft.photoPreview ?? null);
       this.selectedFile = draft.photo || null;
     }
+  }
+
+  loadCategories(): void {
+    this.categoryError.set('');
+    this.categoryService.list().pipe(takeUntilDestroyed(this.destroy)).subscribe({
+      next: categories => this.categories.set(categories),
+      error: () => this.categoryError.set('Could not load service categories.'),
+    });
   }
 
   selectCategory(cat: string): void {
@@ -286,30 +296,35 @@ export class ReportProblemComponent implements OnInit {
     if (selected) {
       if (!selected.type.startsWith("image/") || selected.size > 5 * 1024 * 1024) {
         this.clearPhoto();
-        this.photoError = "Choose an image that is 5 MB or smaller.";
+        this.photoError.set('Choose an image that is 5 MB or smaller.');
         input.value = "";
         return;
       }
-      this.photoError = "";
+      this.photoError.set('');
+      this.photoPreview.set(null);
       this.selectedFile = selected;
       const reader = new FileReader();
       reader.onload = (e) => {
-        this.photoPreview = e.target?.result as string;
+        if (this.selectedFile === selected) this.photoPreview.set(e.target?.result as string);
       };
-      reader.onerror = () => { this.clearPhoto(); this.photoError = "Could not read this image."; };
+      reader.onerror = () => {
+        if (this.selectedFile !== selected) return;
+        this.clearPhoto();
+        this.photoError.set('Could not read this image.');
+      };
       reader.readAsDataURL(selected);
     }
   }
 
   clearPhoto(): void {
-    this.photoError = "";
-    this.photoPreview = null;
+    this.photoError.set('');
+    this.photoPreview.set(null);
     this.selectedFile = null;
   }
 
   onSubmit(): void {
-    if (this.reportForm.valid) {
-      const category = this.categories.find(item => item.id === this.reportForm.value.categoryId);
+    if (this.reportForm.valid && (this.selectedFile ? this.photoPreview() : this.reportForm.value.description?.trim())) {
+      const category = this.categories().find(item => item.id === this.reportForm.value.categoryId);
       if (!category) return;
       this.reportService.draft.set({
         categoryId: category.id,
@@ -317,7 +332,7 @@ export class ReportProblemComponent implements OnInit {
         description: this.reportForm.value.description,
         accessTime: this.reportForm.value.accessTime,
         photo: this.selectedFile,
-        photoPreview: this.photoPreview
+        photoPreview: this.photoPreview()
       });
       this.router.navigate(['/customer/report/review']);
     }

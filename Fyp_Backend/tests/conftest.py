@@ -12,10 +12,21 @@ os.environ["PRELOAD_IMAGE_MODEL"] = "false"
 
 from app import main
 from app.config.settings import settings
+from app.controllers import request_controller
 from app.database import models as m
 from app.database.session import Base, get_db
 from app.middlewares.security import create_access_token, get_password_hash
 from app.routes.auth_routes import attempts
+from app.model_handle.llama_model.repair_guidance import RepairGuidance
+
+
+@pytest.fixture(autouse=True)
+def local_guidance_double(monkeypatch):
+    def generate(_description, category, _detection):
+        return RepairGuidance(title="Test guidance", category=category, urgency="low", summary="Test summary",
+                             safety_note="Keep the area dry", steps=["Check options"])
+
+    monkeypatch.setattr(request_controller, "generate_repair_guidance", generate)
 
 
 @pytest.fixture(scope="session")

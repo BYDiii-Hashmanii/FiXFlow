@@ -43,6 +43,11 @@ export const CUSTOMER_ROUTES: Routes = [
         title: 'AI Analysis | FixFlow'
       },
       {
+        path: 'ai/:id/analysis',
+        loadComponent: () => import('./pages/ai/ai-analysis.component').then(m => m.AiAnalysisComponent),
+        title: 'AI Analysis | FixFlow',
+      },
+      {
         path: 'ai/:id/result',
         loadComponent: () => import('./pages/ai/ai-result.component').then(m => m.AiResultComponent),
         title: 'AI Result | FixFlow'

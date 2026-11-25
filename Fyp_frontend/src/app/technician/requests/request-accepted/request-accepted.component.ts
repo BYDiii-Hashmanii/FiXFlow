@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Title } from '@angular/platform-browser';
@@ -225,6 +225,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
 export class RequestAcceptedComponent implements OnInit {
   private route = inject(ActivatedRoute);
   dataService = inject(DataService);
+  private readonly changeDetector = inject(ChangeDetectorRef);
   private headerService = inject(HeaderService);
   private title = inject(Title);
 
@@ -235,7 +236,10 @@ export class RequestAcceptedComponent implements OnInit {
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) return;
     this.jobId = id;
-    this.dataService.read(this.dataService.getRequestById(id), request => { this.request = request; });
+    this.dataService.read(this.dataService.getRequestById(id), request => {
+      this.request = request;
+      this.changeDetector.markForCheck();
+    });
 
     this.title.setTitle('Request Accepted | FixFlow');
     this.headerService.setHeader({

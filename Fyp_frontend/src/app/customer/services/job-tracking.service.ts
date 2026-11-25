@@ -8,6 +8,9 @@ export interface TrackingInfo {
   requestId: string;
   jobId: string | null;
   title: string | null;
+  category: string;
+  accessTime: string | null;
+  offeredPrice: number | null;
   status: RequestStatus | 'declined';
   offerStatus: OfferStatus | null;
   previousTechnicianIds: string[];

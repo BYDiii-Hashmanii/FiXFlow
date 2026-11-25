@@ -46,19 +46,25 @@ def test_full_workflow(client, prefix, auth, database, monkeypatch, test_passwor
     call("GET", details, other_customer, 404)
     call("POST", details + "/cancel", other_customer, 404)
     offer = call("POST", details + "/offers", customer, json={"technicianId": tech_id})
-    assert call("GET", details + "/track", customer)["status"] == "waiting"
+    waiting = call("GET", details + "/track", customer)
+    assert waiting["status"] == "waiting" and waiting["offerStatus"] == "pending"
+    assert waiting["offeredPrice"] == 800 and waiting["technician"]["id"] == tech_id
     assert call("GET", "/technician/offers", tech)[0]["id"] == offer["id"]
     assert call("GET", f"/technician/requests/{req}", tech)["status"] == "pending"
     assert call("GET", "/technician/offers", other_tech) == []
     call("POST", f"/offers/{offer['id']}/accept", other_tech, 404)
     call("POST", f"/offers/{offer['id']}/accept", tech)
-    assert call("GET", details + "/track", customer)["jobStatus"] == "accepted"
+    accepted = call("GET", details + "/track", customer)
+    assert accepted["jobStatus"] == "accepted" and accepted["offerStatus"] == "accepted"
+    assert accepted["category"] == "Test category" and accepted["accessTime"] == "2026-11-25 12:00"
+    assert accepted["timeline"]["acceptedAt"] and not accepted["timeline"]["startedAt"]
     call("GET", f"/owner/jobs/{req}", other_owner, 404)
     call("GET", job, other_tech, 404)
     call("POST", job + "/start", other_tech, 404)
     call("PUT", f"/owner/technicians/{tech_id}", other_owner, 404, json={"serviceRate": 900})
     call("POST", job + "/start", tech)
-    assert call("GET", details + "/track", customer)["status"] == "in_progress"
+    started = call("GET", details + "/track", customer)
+    assert started["status"] == "in_progress" and started["timeline"]["startedAt"]
     work = call("PUT", job + "/update", tech, json={
         "labourHours": "1.5", "workNotes": "Seal replaced",
         "parts": [{"name": "Seal", "quantity": 2, "unitPrice": "75.50"}],
@@ -69,14 +75,19 @@ def test_full_workflow(client, prefix, auth, database, monkeypatch, test_passwor
     assert client.get(prefix + photo["url"], headers=customer).status_code == 200
     assert client.get(prefix + photo["url"], headers=other_tech).status_code == 404
     call("POST", job + "/complete", tech)
-    assert call("GET", details + "/track", customer)["invoiceEligible"]
+    completed = call("GET", details + "/track", customer)
+    assert completed["invoiceEligible"] and completed["timeline"]["completedAt"]
     invoice = call("POST", job + "/invoice", tech)
     inv = f"/invoices/{invoice['id']}"
     assert call("GET", details + "/track", customer)["invoiceId"] == invoice["id"]
+    customer_invoice = call("GET", inv, customer)
+    assert customer_invoice["photos"] == [photo]
+    assert customer_invoice["status"] == "unpaid" and customer_invoice["workNotes"] == "Seal replaced"
     call("GET", inv, other_customer, 404)
     call("POST", inv + "/pay", other_customer, 404, json={"method": "cash"})
     call("GET", "/owner" + inv, other_owner, 404)
     payment = call("POST", inv + "/pay", customer, json={"method": "card"})
+    assert payment == call("POST", inv + "/pay", customer, json={"method": "cash"})
     assert payment == call("GET", inv + "/receipt", customer)
     assert payment["amount"] == 1351 and payment["method"] == "card" and payment["jobId"] == req
     call("GET", inv + "/receipt", other_customer, 404)
@@ -93,6 +104,7 @@ def test_full_workflow(client, prefix, auth, database, monkeypatch, test_passwor
     }
     technician_events = call("GET", "/notifications", tech)
     assert {item["title"] for item in technician_events} == {"New service request", "Payment received", "New feedback"}
+    assert sum(item["title"] == "Payment received" for item in technician_events) == 1
     assert call("GET", "/notifications", other_customer) == []
     assert call("GET", "/notifications", other_tech) == []
 

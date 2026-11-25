@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Title } from '@angular/platform-browser';
@@ -172,6 +172,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
 export class JobClosedComponent implements OnInit {
   private route = inject(ActivatedRoute);
   dataService = inject(DataService);
+  private readonly changeDetector = inject(ChangeDetectorRef);
   private headerService = inject(HeaderService);
   private title = inject(Title);
 
@@ -180,7 +181,10 @@ export class JobClosedComponent implements OnInit {
   ngOnInit(): void {
     const id = this.route.snapshot.paramMap.get('id');
     if (!id) return;
-    this.dataService.read(this.dataService.getJobById(id), job => { this.job = job; });
+    this.dataService.read(this.dataService.getJobById(id), job => {
+      this.job = job;
+      this.changeDetector.markForCheck();
+    });
 
     this.title.setTitle('Job Closed | FixFlow');
     this.headerService.setHeader({

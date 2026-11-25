@@ -16,50 +16,53 @@ const statusLabels: Record<TrackingInfo['status'], string> = {
   selector: 'app-track-job',
   imports: [RouterLink, DatePipe],
   template: `
-    <section class="tracking card">
+    <section class="flow-screen">
+      <h1 class="flow-page-title">Track Job</h1>
       @if (statusError()) {
         <p role="alert">{{ statusError() }}</p>
         <button class="btn btn-secondary" (click)="load()">Try again</button>
       } @else if (record(); as request) {
-        <h1>{{ request.title || 'Track request' }}</h1>
-        <p>#{{ request.requestId }}</p>
-        <p role="status">{{ labels[request.status] }}</p>
-        @if (request.technician; as technician) {
-          <p>{{ technician.name }} · {{ technician.company }}</p>
-        }
+        <article class="card flow-card flow-row">
+          <div><h2>{{ request.title || 'Service request' }}</h2><p class="flow-muted">Request #{{ request.requestId }}</p></div>
+          <span class="flow-badge" role="status">{{ labels[request.status] }}</span>
+        </article>
         @if (request.declineReason) {
           <p>Reason: {{ request.declineReason.replaceAll('_', ' ') }}</p>
         }
-        <ol>
-          @for (event of events(request); track event.title) {
-            @if (event.when) {
-              <li>{{ event.title }} <time>{{ event.when | date:'medium' }}</time></li>
+        <article class="card flow-card">
+          <h2>Progress</h2>
+          <ol class="flow-list">
+            @for (event of events(request); track event.title) {
+              <li>
+                <span [class.flow-success]="event.when" class="flow-badge" aria-hidden="true">{{ event.when ? '✓' : '○' }}</span>
+                <div>{{ event.title }} @if (event.when) { · <time [attr.datetime]="event.when">{{ event.when | date:'shortTime' }}</time> }</div>
+              </li>
             }
-          }
-        </ol>
-        <div class="actions">
+          </ol>
+        </article>
+        @if (request.technician; as tech) {
+          <article class="card flow-card flow-person"><span class="flow-avatar">{{ tech.avatarInitials }}</span><div>
+            <strong>{{ tech.name }}</strong><p class="flow-muted">{{ tech.company }}</p>
+          </div></article>
+        }
+        @if (!request.invoiceId && (request.jobStatus === 'accepted' || request.jobStatus === 'in_progress' || request.invoiceEligible)) {
+          <p class="flow-note">When the work is completed, your invoice will arrive here and in Notifications.</p>
+        }
+        <div class="flow-actions">
           @if (request.retryAllowed || request.status === 'ai_analysis') {
             <a class="btn btn-primary" [routerLink]="['/customer/booking', request.requestId, 'choose']">Choose a technician</a>
           }
           @if (request.invoiceId) {
             <a class="btn btn-primary" [routerLink]="['/customer/invoices', request.invoiceId]">View invoice</a>
-          } @else if (request.invoiceEligible) {
-            <p>The technician can now issue the invoice.</p>
           }
           <button class="btn btn-secondary" (click)="load()" [disabled]="loading()">Refresh</button>
-          <a class="btn btn-secondary" routerLink="/customer/requests">My requests</a>
+          <a class="btn btn-secondary" routerLink="/customer/requests">Back to My Requests</a>
         </div>
       } @else {
         <p role="status">Loading request…</p>
       }
     </section>
   `,
-  styles: [`
-    .tracking { max-width: 44rem; margin: 1rem auto; padding: clamp(1rem, 4vw, 2rem); }
-    ol { padding-inline-start: 1.25rem; }
-    time { margin-inline-start: .5rem; }
-    .actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
-  `],
 })
 export class TrackJobComponent implements OnInit {
   private readonly tracking = inject(JobTrackingService);
@@ -72,19 +75,16 @@ export class TrackJobComponent implements OnInit {
   readonly labels = statusLabels;
 
   ngOnInit(): void {
-    this.header.setHeader({ title: 'Track Job', showBack: true, backUrl: '/customer/requests', showBell: true });
+    this.header.setHeader({ title: 'Track Job', showBack: true, backUrl: '/customer/requests', showBell: false });
     this.load();
   }
 
   events(record: TrackingInfo) {
     const time = record.timeline;
     return [
-      { title: 'Offer sent', when: time.sentAt },
-      { title: 'Technician responded', when: time.respondedAt },
-      { title: 'Request accepted', when: time.acceptedAt },
-      { title: 'Work started', when: time.startedAt },
-      { title: 'Work completed', when: time.completedAt },
-      { title: 'Closed', when: time.closedAt },
+      { title: 'Request Accepted', when: time.acceptedAt },
+      { title: 'Work Started', when: time.startedAt },
+      { title: 'Work Completed', when: time.completedAt },
     ];
   }
 

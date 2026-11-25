@@ -1,0 +1,234 @@
+.flow-screen {
+  width: min(100%, 34rem);
+  margin-inline: auto;
+  min-height: calc(100dvh - 10rem);
+  padding: 1rem .75rem;
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+
+  h1 { font-size: 1.2rem; margin: 0; }
+  h2 { font-size: 1rem; margin: 0 0 .25rem; }
+  p { margin: 0; overflow-wrap: anywhere; }
+
+  .flow-card { padding: .875rem; }
+  .flow-stack { display: grid; gap: .65rem; }
+  .flow-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+  .flow-person { display: flex; align-items: center; gap: .6rem; }
+  .flow-avatar { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; flex-shrink: 0; border-radius: 50%; background: #e8efff; color: #1646a7; font-weight: 600; }
+  .flow-badge { display: inline-block; padding: .2rem .5rem; border-radius: 1rem; background: #e8efff; color: #1646a7; font-size: .8rem; }
+  .flow-badge.flow-success { background: #e8f7ee; color: #126741; }
+  .flow-badge.flow-warning { background: #fff2d8; color: #774a00; border: 0; }
+  .flow-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
+  .flow-chips button { padding: .35rem .7rem; border: 1px solid #dfe7f3; border-radius: 2rem; background: white; color: #233550; font: inherit; cursor: pointer; }
+  .flow-chips button[aria-pressed='true'] { background: #245deb; color: white; }
+  .flow-actions { margin-block-start: auto; padding-block-start: .5rem; display: grid; gap: .5rem; }
+  .flow-actions-pair { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .flow-actions .btn { width: 100%; }
+  .flow-center { flex: 1; display: grid; align-content: center; justify-items: center; gap: .65rem; text-align: center; }
+  .flow-outcome { display: grid; justify-items: center; gap: .5rem; padding: 1.5rem 0 .75rem; text-align: center; }
+  .flow-accent { color: var(--color-primary, #245deb); }
+  .flow-muted { color: var(--color-text-secondary, #53617a); }
+  .flow-note { background: #edf3ff; border: 1px solid #d6e4ff; border-radius: .5rem; padding: .75rem; color: #1646a7; }
+  .flow-warning { background: #fff7e6; border: 1px solid #f6dfac; border-radius: .5rem; padding: .75rem; color: #774a00; }
+  .flow-success { background: #e8f7ee; color: #126741; }
+  .flow-symbol { display: grid; place-items: center; width: 3.5rem; height: 3.5rem; border-radius: 50%; font-size: 1.5rem; }
+  .flow-list { list-style: none; margin: 0; padding: 0; }
+  .flow-list li { display: flex; align-items: flex-start; gap: .5rem; padding-block: .375rem; }
+  .flow-list input { accent-color: var(--color-primary, #245deb); inline-size: 1.15rem; block-size: 1.15rem; flex-shrink: 0; }
+  .flow-spinner { width: 4.5rem; height: 4.5rem; border: .25rem solid #dfe7f3; border-top-color: #245deb; border-radius: 50%; animation: flow-spin .8s linear infinite; }
+  .flow-preview { width: 100%; aspect-ratio: 5 / 4; object-fit: contain; border-radius: .5rem; background: #dce6f4; }
+  label { display: block; }
+  dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .4rem; margin: 0; }
+  dd { margin: 0; text-align: end; overflow-wrap: anywhere; font-weight: 600; }
+}
+@keyframes flow-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .flow-screen .flow-spinner { animation: none; } }
+@media (width < 1024px) {
+  .workflow-page .flow-screen > .flow-page-title { display: none; }
+  .workflow-page .flow-screen:not(.repair-flow) { min-height: calc(100dvh - 6.5rem); }
+}
+
+.flow-screen.repair-flow {
+  width: min(100%, 60rem);
+  min-height: 0;
+  padding: 0;
+  gap: clamp(.875rem, 2vw, 1.25rem);
+
+  &.repair-checklist { max-width: 48rem; }
+
+  h1 { font-size: clamp(1.35rem, 2.4vw, 1.8rem); overflow-wrap: anywhere; }
+  h2 { font-size: 1.075rem; margin: 0; }
+
+  .repair-panel { padding: clamp(1rem, 2.5vw, 1.625rem); }
+  .repair-review-grid, .repair-review-fields, .repair-summary, .repair-state, .repair-next {
+    display: grid;
+    gap: 1rem;
+    align-content: start;
+    min-width: 0;
+  }
+  .repair-review-fields {
+    .form-group { margin-bottom: 0; }
+    label { font-weight: 600; }
+    label span { color: var(--color-text-muted); font-weight: 400; }
+  }
+  .repair-photo {
+    align-self: start;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-border-subtle);
+
+    img { display: block; width: 100%; max-height: min(54dvh, 30rem); object-fit: contain; }
+  }
+  .repair-photo-empty {
+    display: grid;
+    gap: .625rem;
+    justify-items: center;
+    align-content: center;
+    min-height: 9rem;
+    padding: 1rem;
+    color: var(--color-text-muted);
+  }
+  .repair-actions {
+    display: flex;
+    flex-direction: column;
+    gap: .625rem;
+
+    .btn { min-width: 0; }
+  }
+  .repair-review-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin-top: 1.125rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--color-border);
+
+    .btn { padding-inline: .5rem; }
+  }
+  .repair-summary-heading {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: .625rem 1rem;
+
+    h1 { flex: 1 1 15rem; min-width: 0; }
+    .chip { margin-block-start: .125rem; }
+  }
+  .repair-metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .75rem 2rem;
+    border-top: 1px solid var(--color-border);
+    padding-top: .875rem;
+
+    dt { font-size: .8rem; color: var(--color-text-muted); }
+    dd { text-align: start; }
+  }
+  .repair-guidance {
+    display: grid;
+    gap: 1rem;
+    align-items: start;
+  }
+  .repair-instructions h2 { padding-bottom: .75rem; }
+  .repair-step-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow-wrap: anywhere;
+
+    li { border-top: 1px solid var(--color-border-subtle); }
+    &:not(.repair-step-controls) li {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: start;
+      gap: .75rem;
+      padding-block: .75rem;
+    }
+    &:not(.repair-step-controls) li:last-child { padding-bottom: 0; }
+  }
+  .repair-step-marker {
+    display: grid;
+    place-items: center;
+    inline-size: 1.75rem;
+    block-size: 1.75rem;
+    border-radius: var(--radius-full);
+    background: var(--color-primary-light);
+    color: var(--color-primary-hover);
+    font-size: .82rem;
+    font-weight: 600;
+  }
+  .repair-notice {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: .625rem;
+    padding: .875rem 1rem;
+    border: 1px solid var(--color-primary-border);
+    border-radius: var(--radius-md);
+    background: var(--color-primary-light);
+    color: var(--color-primary-active);
+
+    p, h2 { color: inherit; }
+    h2 { font-size: .95rem; margin-bottom: .25rem; }
+    > app-icon { margin-top: .15rem; }
+    &[role='alert'] { display: block; }
+  }
+  .repair-notice-warning {
+    border-color: var(--status-orange-border);
+    background: var(--status-orange-bg);
+    color: #90350f;
+  }
+  .repair-progress {
+    display: grid;
+    gap: .375rem;
+    color: var(--color-text-secondary);
+    font-size: .875rem;
+    font-weight: 600;
+
+    progress { appearance: none; width: 100%; height: .5rem; overflow: hidden; border: 0; border-radius: var(--radius-full); background: var(--color-border); }
+    progress::-webkit-progress-bar { background: var(--color-border); }
+    progress::-webkit-progress-value { border-radius: var(--radius-full); background: var(--color-primary); }
+    progress::-moz-progress-bar { border-radius: var(--radius-full); background: var(--color-primary); }
+  }
+  .repair-step-control {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: .75rem;
+    min-height: 3rem;
+    padding: .625rem .5rem;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+
+    &:hover { background: var(--color-border-subtle); }
+    &:has(input:focus-visible) { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+    input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+    .repair-step-marker { border: 1px solid var(--color-primary-border); }
+    .repair-step-marker app-icon { display: none; }
+    input:checked + .repair-step-marker {
+      color: var(--status-green-text);
+      background: var(--status-green-bg);
+      border-color: var(--status-green-border);
+
+      > span { display: none; }
+      app-icon { display: inline-flex; }
+    }
+  }
+
+  @media (min-width: 48rem) {
+    .repair-review-grid { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 1.5rem; }
+    .repair-guidance.with-steps { grid-template-columns: minmax(0, 1.7fr) minmax(15rem, 1fr); }
+    .repair-review-actions, .repair-finish-actions {
+      display: flex;
+      flex-direction: row;
+      justify-content: flex-end;
+      .btn { min-width: 9rem; padding-inline: 1.25rem; }
+    }
+    .repair-state { justify-items: start; }
+  }
+}

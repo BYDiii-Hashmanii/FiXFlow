@@ -11,8 +11,9 @@ class TechnicianController:
         self.db = db
         self.repo = TechnicianRepository(db)
 
-    def list(self, page: Pagination, category_id: Optional[int] = None) -> List[dict]:
-        techs = self.repo.list_all(page, category_id=category_id)
+    def list(self, page: Pagination, category_id: Optional[int] = None, *, category: str | None = None,
+             available: bool = False, best_match: bool = False) -> List[dict]:
+        techs = self.repo.list_all(page, category_id=category_id, category=category, available=available, best_match=best_match)
         return [format_technician_info(t) for t in techs]
 
     def get_by_id(self, tech_id: int) -> dict:

@@ -47,6 +47,8 @@ export interface RepairStep {
 }
 
 export interface AiAnalysis {
+  stage?: 'image' | 'guidance' | 'done' | null;
+  visionState?: 'ready' | 'no_detection' | 'failed' | 'skipped' | null;
   state: "pending" | "ready" | "no_detection" | "failed";
   provenance: string | null;
   confidence: number | null;
@@ -146,10 +148,11 @@ export interface InvoiceInfo {
   jobTitle: string;
   technician: TechnicianInfo;
   parts: JobPart[];
+  photos: JobPhoto[];
   labourCost: number; // db: labour_cost
   totalCost: number; // db: total_cost
   status: InvoiceStatus; // db: status ('unpaid', 'paid')
-  workNotes: string; // db: work_notes
+  workNotes: string | null; // db: work_notes
   createdAt: string; // db: created_at
   paidAt?: string; // db: paid_at
 }
