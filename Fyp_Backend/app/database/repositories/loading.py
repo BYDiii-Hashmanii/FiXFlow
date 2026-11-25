@@ -13,13 +13,15 @@ def technician_loads():
 def request_loads():
     return (
         selectinload(m.ServiceRequest.customer), selectinload(m.ServiceRequest.category),
+        selectinload(m.ServiceRequest.final_category),
         selectinload(m.ServiceRequest.assigned_technician).options(*technician_loads()),
     )
 
 
 def job_loads():
     return (
-        selectinload(m.Job.request).options(selectinload(m.ServiceRequest.customer), selectinload(m.ServiceRequest.category)),
+        selectinload(m.Job.request).options(selectinload(m.ServiceRequest.customer), selectinload(m.ServiceRequest.category),
+                                           selectinload(m.ServiceRequest.final_category)),
         selectinload(m.Job.technician).options(*technician_loads()), selectinload(m.Job.parts),
         selectinload(m.Job.invoice), selectinload(m.Job.photos),
     )

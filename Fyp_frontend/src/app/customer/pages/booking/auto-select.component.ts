@@ -2,7 +2,7 @@ import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HeaderService } from '../../../core/services/header.service';
-import { switchMap, tap } from 'rxjs';
+import { EMPTY, switchMap, tap } from 'rxjs';
 import { errorMessage } from '../../../core/interceptors/error.interceptor';
 import { RequestService } from '../../services/request.service';
 import { TechnicianService } from '../../services/technician.service';
@@ -58,7 +58,13 @@ export class AutoSelectComponent implements OnInit {
     this.loading.set(true);
     this.requests.getById(this.id).pipe(
       tap(request => this.category.set(request.category)),
-      switchMap(() => this.api.autoSelect(this.id)),
+      switchMap(request => {
+        if (request.categoryChoiceRequired || request.aiAnalysis?.state === 'pending') {
+          void this.router.navigate(['/customer/booking', this.id, 'options'], { replaceUrl: true });
+          return EMPTY;
+        }
+        return this.api.autoSelect(this.id);
+      }),
       takeUntilDestroyed(this.destroy),
     ).subscribe({
       next: tech => void this.router.navigate(['/customer/booking', this.id, 'selected', tech.id], { queryParams: { mode: 'auto' } }),

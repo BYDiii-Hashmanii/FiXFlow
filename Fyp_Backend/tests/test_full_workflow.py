@@ -31,7 +31,7 @@ def test_full_workflow(client, prefix, auth, database, monkeypatch, test_passwor
     customer = {"Authorization": "Bearer " + customer_session["token"]}
 
     monkeypatch.setattr(request_controller, "analyze_file", lambda _: {
-        "primary_issue": "fixture", "confidence": 0.85,
+        "primary_issue": None, "confidence": None,
         "analysis": {"title": "Reported issue", "category": "Test category", "urgency": "low",
                      "summary": "Fixture diagnosis", "safety_note": "",
                      "steps": [{"step_no": 1, "instruction": "Check options"}]},

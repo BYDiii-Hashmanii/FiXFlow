@@ -31,8 +31,9 @@ import { ProblemReportService } from '../../services/problem-report.service';
             <li><span aria-hidden="true">{{ progress()?.visionState ? '✓' : '○' }}</span>
               {{ progress()?.visionState === 'skipped' ? 'No image attached' :
                  progress()?.visionState === 'failed' ? 'Image analysis unavailable' : 'Image analyzed' }}</li>
-            <li><span aria-hidden="true">{{ progress()?.detectorLabel || progress()?.state === 'ready' ? '✓' : '○' }}</span> Problem identified</li>
-            <li><span aria-hidden="true">{{ progress()?.state === 'ready' ? '✓' : '○' }}</span> Checking safe repair steps</li>
+            <li><span aria-hidden="true">{{ progress()?.visionState === 'ready' || progress()?.state === 'ready' ? '✓' : '○' }}</span> Problem identified</li>
+            <li><span aria-hidden="true">{{ progress()?.state === 'ready' ? '✓' : '○' }}</span>
+              {{ progress()?.stage === 'guidance' ? 'Checking safe repair steps' : 'Preparing repair guidance' }}</li>
           </ul>
         }
       </div>

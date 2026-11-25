@@ -1,11 +1,11 @@
 from fastapi import HTTPException
-from sqlalchemy import or_
+from sqlalchemy import func
 from sqlalchemy.orm import Session, selectinload
 from app.api.schemas.pagination import Pagination
 
 from app.controllers.lifecycle import commit, notify, now_utc, require_transition, transition
 from app.controllers.auth_controller import get_initials
-from app.controllers.request_controller import format_technician_info
+from app.controllers.request_controller import format_technician_info, require_booking_category
 from app.controllers.uploads import media_url
 from app.database import models as m
 from app.database.repositories.access import found
@@ -36,7 +36,9 @@ class OfferController:
         can_contact = offer.status == m.OfferStatus.accepted and req.assigned_technician_id == offer.technician_id
         return {
             **offer_response(offer), "title": req.title, "description": req.description,
-            "category": req.category.name, "accessTime": req.access_time,
+            "category": req.effective_category.name, "accessTime": req.access_time,
+            "detectedDisplayName": req.detected_display_name if req.vision_state == "ready" else None,
+            "detectionConfidence": float(req.analysis_confidence) if req.vision_state == "ready" and req.analysis_confidence is not None else None,
             "photoUrl": media_url(req.photo_path) if req.photo_path else None,
             "customer": {"name": req.customer.full_name, "avatarInitials": get_initials(req.customer.full_name),
                          "phone": req.customer.phone if can_contact else None, "address": req.address},
@@ -58,17 +60,20 @@ class OfferController:
         return [self.card(offer) for offer in page.apply(query.order_by(m.RequestOffer.sent_at.desc(), m.RequestOffer.id.desc()))]
 
     def send(self, req: m.ServiceRequest, technician_id: int) -> dict:
+        require_booking_category(req)
         tech = found(
             self.db.query(m.Technician).filter(
                 m.Technician.user_id == technician_id,
                 m.Technician.user.has(m.User.is_active.is_(True)),
             ), "Technician"
         )
-        if tech.category_id != req.category_id or tech.availability != m.AvailabilityStatus.available:
+        if tech.category_id != req.effective_category_id or tech.availability != m.AvailabilityStatus.available:
             raise HTTPException(409, "Technician is unavailable for this category")
         require_transition(transition(
             self.db, m.ServiceRequest, req.id, (m.RequestStatus.ai_analysis,), m.RequestStatus.waiting,
             conditions=(m.ServiceRequest.assigned_technician_id.is_(None),
+                        m.ServiceRequest.analysis_state != "pending",
+                        func.coalesce(m.ServiceRequest.final_category_id, m.ServiceRequest.category_id) == tech.category_id,
                         ~m.ServiceRequest.offers.any(m.RequestOffer.status == m.OfferStatus.pending)),
             assigned_technician_id=tech.user_id,
         ))

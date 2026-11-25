@@ -3,10 +3,12 @@ from datetime import timezone
 from pathlib import Path
 
 from fastapi import HTTPException, UploadFile
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.api.schemas.pagination import Pagination
 from app.config.settings import settings
+from app.controllers.analysis_decision import Detection, combine_urgency, decide_analysis
 from app.controllers.auth_controller import get_initials
 from app.controllers.lifecycle import commit
 from app.controllers.uploads import media_url, store_image
@@ -16,6 +18,7 @@ from app.database.repositories.loading import request_loads
 from app.database.repositories.numbers import next_number
 from app.database.repositories.technician_repository import by_best_match
 from app.model_handle.inference import chat_inference, image_inference
+from app.model_handle.image_model.label_map import LABEL_MAP, OTHER
 from app.model_handle.llama_model.repair_guidance import generate_repair_guidance
 
 logger = logging.getLogger(__name__)
@@ -40,21 +43,44 @@ def format_technician_info(tech: m.Technician | None) -> dict | None:
     }
 
 
+def category_choice_required(req: m.ServiceRequest) -> bool:
+    return req.final_category_id is None and (
+        req.category_source == "mismatch" or (req.category_source == "customer" and req.category_id == OTHER)
+    )
+
+
+def require_booking_category(req: m.ServiceRequest) -> None:
+    if req.analysis_state == "pending":
+        raise HTTPException(409, "Wait for the analysis to finish before booking")
+    if category_choice_required(req):
+        raise HTTPException(409, "Choose a service category before booking")
+
+
 def format_analysis(req: m.ServiceRequest) -> dict:
     analysis = req.ai_analysis if req.analysis_state == "ready" else None
     return {
         "state": req.analysis_state, "provenance": req.analysis_source,
         "stage": req.analysis_stage, "visionState": req.vision_state,
         "confidence": float(req.analysis_confidence) if req.analysis_confidence is not None else None,
-        "detectorLabel": req.detector_label, "detectedCategory": req.detected_category,
-        "title": analysis.problem_title if analysis else None,
-        "category": req.guidance_category or req.detected_category or req.category.name,
-        "urgency": analysis.urgency.value if analysis else None,
+        "detectorLabel": req.detector_label, "detectedDisplayName": req.detected_display_name,
+        "detectedCategoryId": req.detected_category_id,
+        "detectedCategory": req.detected_service_category.name if req.detected_service_category else req.detected_category,
+        "customerCategoryId": req.category_id, "customerCategory": req.category.name,
+        "categorySource": req.category_source,
+        "suggestedCategoryId": req.suggested_category_id,
+        "suggestedCategory": req.suggested_category.name if req.suggested_category else None,
+        "finalCategoryId": req.final_category_id,
+        "categoryChoiceRequired": category_choice_required(req),
+        "title": analysis.problem_title if analysis else (req.detected_display_name if req.vision_state == "ready" else None),
+        "category": req.effective_category.name,
+        "urgency": req.urgency.value if req.urgency else (analysis.urgency.value if analysis else None),
+        "safetyCritical": req.safety_critical,
+        "diyAllowed": req.diy_allowed,
         "summary": analysis.summary if analysis else None,
-        "safetyNote": analysis.safety_note if analysis else None,
+        "safetyNote": req.decision_safety_note or (analysis.safety_note if analysis else None),
         "steps": [
             {"stepNo": step.step_no, "instruction": step.instruction, "completed": False}
-            for step in (analysis.steps if analysis else ())
+            for step in (analysis.steps if analysis and req.diy_allowed is not False else ())
         ],
     }
 
@@ -65,8 +91,10 @@ def format_request_response(req: m.ServiceRequest, *, include_analysis: bool = T
         "title": req.title,
         "customerId": str(req.customer_id),
         "customerName": req.customer.full_name,
-        "categoryId": req.category_id,
-        "category": req.category.name,
+        "categoryId": req.effective_category_id,
+        "category": req.effective_category.name,
+        "finalCategoryId": req.final_category_id,
+        "categoryChoiceRequired": category_choice_required(req),
         "description": req.description,
         "accessTime": req.access_time,
         "photoUrl": media_url(req.photo_path) if req.photo_path else None,
@@ -82,48 +110,78 @@ def format_request_response(req: m.ServiceRequest, *, include_analysis: bool = T
 
 
 def analyze_file(path: Path) -> dict:
-    from app.model_handle.image_model.prediction import ISSUE_METADATA, predict_image
+    from app.model_handle.image_model.prediction import predict_image
 
-    result = predict_image(path)
-    if result.get("primary_issue") not in ISSUE_METADATA:
-        result["analysis"] = None
-    return result
+    return predict_image(path)
 
 
 async def analyze_request(bind, request_id: int, photo: str | None) -> None:
     result = {}
-    vision = "skipped"
+    state = "skipped"
     if photo:
         try:
             result = await image_inference.run(analyze_file, Path(photo), timeout=settings.IMAGE_TIMEOUT_SECONDS)
-            vision = "ready" if result.get("analysis") else "no_detection"
+            state = "ready" if result.get("primary_issue") else "no_detection"
         except Exception:
             logger.warning("Image inference failed for request %s", request_id, exc_info=True)
-            vision = "failed"
+            state = "failed"
     try:
-        detected = result.get("analysis") or {}
         with Session(bind) as db:
             req = db.get(m.ServiceRequest, request_id)
             if req is None or req.analysis_state != "pending":
                 return
-            description, category = req.description, req.category.name
-            req.analysis_stage = "guidance"
-            req.vision_state = vision
-            req.analysis_confidence = result.get("confidence")
-            req.detector_label = result.get("primary_issue")
-            req.detected_category = detected.get("category")
-            if not description and vision != "ready":
-                req.analysis_stage = "done"
-                req.analysis_state = vision
-                req.analysis_source = "yolo"
-                db.commit()
-                return
+            detection = Detection(state, result.get("primary_issue"), result.get("confidence"))
+            decision = decide_analysis(req.category_id, req.description or "", detection,
+                                       threshold=settings.DETECTION_CONFIDENCE_THRESHOLD)
+            metadata = LABEL_MAP.get(detection.label or "")
+            req.vision_state = decision.vision_state
+            req.analysis_confidence = detection.confidence
+            req.detector_label = detection.label
+            req.detected_display_name = metadata.display_name if metadata else None
+            req.detected_category_id = metadata.category_id if metadata else None
+            req.final_category_id = decision.final_category_id
+            req.category_source = decision.category_source
+            req.suggested_category_id = decision.suggested_category_id
+            req.urgency = decision.urgency
+            req.safety_critical = decision.safety_critical
+            req.diy_allowed = decision.diy_allowed
+            req.decision_safety_note = decision.safety_note
+            if decision.label:
+                req.title = decision.label.display_name
+            if decision.category_source == "mismatch":
+                req.analysis_state, req.analysis_stage, req.analysis_source = "needs_category", "done", "yolo"
+            elif not req.description and decision.vision_state != "ready":
+                req.analysis_state, req.analysis_stage, req.analysis_source = decision.vision_state, "done", "yolo"
+            else:
+                req.analysis_stage = "guidance"
+            needs_guidance = req.analysis_state == "pending"
             db.commit()
+    except Exception:
+        record_analysis_failure(bind, request_id)
+        return
+    if needs_guidance:
+        await complete_guidance(bind, request_id)
 
+
+async def complete_guidance(bind, request_id: int) -> None:
+    try:
+        with Session(bind) as db:
+            req = db.get(m.ServiceRequest, request_id)
+            if req is None or req.analysis_state != "pending":
+                return
+            is_confident = req.vision_state == "ready"
+            policy = LABEL_MAP[req.detector_label] if is_confident and req.detector_label else None
+            category, description = req.effective_category.name, req.description or ""
+            detection = {
+                "state": req.vision_state,
+                "label": req.detector_label if policy else None,
+                "display_name": policy.display_name if policy else None,
+                "confidence": float(req.analysis_confidence) if req.analysis_confidence is not None else None,
+                "hint": policy.hint if policy else None,
+                "diy_allowed": req.diy_allowed,
+            }
         guidance = await chat_inference.run(
-            generate_repair_guidance, description or "", category,
-            {"label": result.get("primary_issue"), "category": detected.get("category"),
-             "confidence": result.get("confidence"), "state": vision},
+            generate_repair_guidance, description, category, detection,
             timeout=settings.GUIDANCE_TIMEOUT_SECONDS,
         )
         with Session(bind) as db:
@@ -131,25 +189,29 @@ async def analyze_request(bind, request_id: int, photo: str | None) -> None:
             if req is None or req.analysis_state != "pending":
                 return
             req.analysis_state, req.analysis_stage = "ready", "done"
-            req.analysis_source = "yolo+llama" if vision == "ready" else "llama"
-            req.guidance_category = guidance.category
-            req.urgency = m.UrgencyLevel(guidance.urgency)
-            req.title = guidance.title
+            req.analysis_source = "yolo+llama" if is_confident else "llama"
+            req.urgency = combine_urgency(req.urgency, guidance.urgency, bool(req.safety_critical))
+            req.title = policy.display_name if policy else guidance.title
             db.add(m.AiAnalysis(
-                request=req, problem_title=guidance.title, summary=guidance.summary,
-                urgency=req.urgency, safety_note=guidance.safety_note,
+                request=req, problem_title=req.title, summary=guidance.summary,
+                urgency=req.urgency, safety_note=req.decision_safety_note or guidance.safety_note,
                 steps=[m.AiRepairStep(step_no=index, instruction=instruction)
-                       for index, instruction in enumerate(guidance.steps, 1)],
+                       for index, instruction in enumerate(guidance.steps if req.diy_allowed else (), 1)],
             ))
             db.commit()
     except Exception:
-        logger.exception("Repair guidance failed for request %s", request_id)
-        with Session(bind) as db:
-            req = db.get(m.ServiceRequest, request_id)
-            if req and req.analysis_state == "pending":
-                req.analysis_state = "failed"
-                req.analysis_stage = "done"
-                db.commit()
+        record_analysis_failure(bind, request_id)
+
+
+def record_analysis_failure(bind, request_id: int) -> None:
+    logger.exception("Analysis failed for request %s", request_id)
+    with Session(bind) as db:
+        req = db.get(m.ServiceRequest, request_id)
+        if req and req.analysis_state == "pending":
+            req.analysis_state, req.analysis_stage = "failed", "done"
+            if req.vision_state == "ready":
+                req.analysis_source = "yolo"
+            db.commit()
 
 
 class RequestController:
@@ -197,8 +259,9 @@ class RequestController:
         return [format_request_response(req, include_analysis=False) for req in page.apply(query)]
 
     def auto_select(self, req: m.ServiceRequest) -> dict:
+        require_booking_category(req)
         query = self.db.query(m.Technician).filter(
-            m.Technician.category_id == req.category_id,
+            m.Technician.category_id == req.effective_category_id,
             m.Technician.user.has(m.User.is_active.is_(True)),
             m.Technician.availability == m.AvailabilityStatus.available,
             ~m.Technician.offers.any(m.RequestOffer.request_id == req.id),
@@ -207,6 +270,25 @@ class RequestController:
         if not tech:
             raise HTTPException(404, "No available technician for this category")
         return format_technician_info(tech)
+
+    def change_category(self, req: m.ServiceRequest, category_id: int) -> bool:
+        found(self.db.query(m.ServiceCategory).filter_by(id=category_id), "Category")
+        resume_guidance = req.analysis_state == "needs_category"
+        changes = {"final_category_id": category_id, "category_source": req.category_source or "customer"}
+        if resume_guidance:
+            changes.update(analysis_state="pending", analysis_stage="guidance")
+        result = self.db.execute(
+            update(m.ServiceRequest).where(
+                m.ServiceRequest.id == req.id, m.ServiceRequest.assigned_technician_id.is_(None),
+                m.ServiceRequest.status == m.RequestStatus.ai_analysis,
+                m.ServiceRequest.analysis_state == req.analysis_state,
+                m.ServiceRequest.analysis_state != "pending",
+            ).values(**changes)
+        )
+        if result.rowcount != 1:
+            raise HTTPException(409, "The category can only be changed before a technician is assigned and after analysis")
+        commit(self.db)
+        return resume_guidance
 
     def track(self, req: m.ServiceRequest, user: m.User) -> dict:
         offers = req.offers
@@ -232,7 +314,7 @@ class RequestController:
             "requestId": req.request_no,
             "jobId": req.request_no if job else None,
             "title": req.title,
-            "category": req.category.name,
+            "category": req.effective_category.name,
             "accessTime": req.access_time,
             "offeredPrice": float(offer.quoted_price) if offer else None,
             "status": status,

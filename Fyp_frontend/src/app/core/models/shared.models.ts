@@ -48,12 +48,23 @@ export interface RepairStep {
 
 export interface AiAnalysis {
   stage?: 'image' | 'guidance' | 'done' | null;
-  visionState?: 'ready' | 'no_detection' | 'failed' | 'skipped' | null;
-  state: "pending" | "ready" | "no_detection" | "failed";
+  visionState?: 'ready' | 'no_detection' | 'failed' | 'skipped' | 'uncertain' | null;
+  state: 'pending' | 'ready' | 'no_detection' | 'failed' | 'uncertain' | 'needs_category';
   provenance: string | null;
   confidence: number | null;
   detectorLabel: string | null;
+  detectedDisplayName: string | null;
   detectedCategory: string | null;
+  detectedCategoryId: number | null;
+  customerCategoryId: number;
+  customerCategory: string;
+  categorySource: 'customer' | 'confirmed' | 'mismatch' | null;
+  suggestedCategoryId: number | null;
+  suggestedCategory: string | null;
+  finalCategoryId: number | null;
+  categoryChoiceRequired: boolean;
+  safetyCritical: boolean | null;
+  diyAllowed: boolean | null;
   title: string | null; // db: title
   category: string; // db: category
   urgency: Urgency | null; // db: urgency ('medium')
@@ -80,6 +91,8 @@ export interface TechnicianInfo {
 
 export interface ServiceRequest {
   categoryId: number;
+  finalCategoryId: number | null;
+  categoryChoiceRequired: boolean;
   title?: string | null;
   id: string; // db: id (e.g. 'FF-0142')
   customerId: string; // db: customer_id

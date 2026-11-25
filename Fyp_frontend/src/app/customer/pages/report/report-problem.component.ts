@@ -1,6 +1,6 @@
 import { CategoryService } from '../../../core/services/category.service';
 import { ServiceCategory } from '../../models/customer.models';
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, OnInit, effect, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -51,29 +51,45 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
           ></textarea>
         </div>
 
-        <!-- Add Photo upload with camera/gallery (Screen 5) -->
-        <div class="form-group photo-section">
-          <label for="requestPhoto">Add a photo</label>
+        <div class="form-group photo-section" role="group" aria-labelledby="photo-label">
+          <span class="section-label" id="photo-label">Add a photo</span>
           @if (photoError()) { <p id="requestPhotoError" role="alert">{{ photoError() }}</p> }
           <input
             #fileInput id="requestPhoto" [attr.aria-describedby]="photoError() ? 'requestPhotoError' : null"
             type="file"
             accept="image/*"
-            capture="environment"
             class="hidden-file-input"
             (change)="onFileSelected($event)"
           />
+          <input #nativeCamera type="file" accept="image/*" capture="environment" class="hidden-file-input"
+            (change)="onFileSelected($event)" />
 
-          @if (!photoPreview()) {
-            <button type="button" class="photo-upload-placeholder" (click)="fileInput.click()">
-              <app-icon name="camera" size="md"></app-icon>
-              <span>Take photo or choose from gallery</span>
-            </button>
-          } @else {
+          @if (cameraOpen()) {
+            <div class="camera-panel" role="group" aria-label="Camera">
+              <video #cameraVideo aria-label="Live camera preview" autoplay muted playsinline (loadeddata)="cameraReady.set(true)"></video>
+              @if (!cameraReady()) { <p role="status">Starting camera…</p> }
+              <div class="photo-actions">
+                <button type="button" class="btn btn-secondary" (click)="closeCamera()">Cancel</button>
+                <button type="button" class="btn btn-primary" [disabled]="!cameraReady() || capturing()" (click)="capturePhoto()">
+                  <app-icon name="camera" size="sm" aria-hidden="true" /> Capture Photo
+                </button>
+              </div>
+            </div>
+          } @else if (photoPreview()) {
             <div class="photo-preview-box">
               <img [src]="photoPreview()" alt="Problem photo preview" class="preview-img" />
               <button type="button" class="btn-remove-photo" aria-label="Remove selected photo" (click)="clearPhoto()">
                 <app-icon name="x" size="sm"></app-icon>
+              </button>
+            </div>
+          }
+          @if (!cameraOpen()) {
+            <div class="photo-actions">
+              <button type="button" class="btn btn-secondary" (click)="openCamera(nativeCamera)">
+                <app-icon name="camera" size="sm" aria-hidden="true" /> {{ photoPreview() ? 'Retake Photo' : 'Take Photo' }}
+              </button>
+              <button type="button" class="btn btn-secondary" (click)="fileInput.click()">
+                <app-icon name="file-text" size="sm" aria-hidden="true" /> Choose from Gallery
               </button>
             </div>
           }
@@ -94,7 +110,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
         <button
           type="submit"
           class="btn btn-primary btn-block btn-continue"
-          [disabled]="reportForm.invalid || (!selectedFile && !reportForm.get('description')?.value?.trim()) || (selectedFile && !photoPreview())"
+          [disabled]="cameraOpen() || reportForm.invalid || (!selectedFile && !reportForm.get('description')?.value?.trim()) || (selectedFile && !photoPreview())"
         >
           Continue to AI Analysis
         </button>
@@ -131,12 +147,6 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
         flex-direction: column;
         gap: 8px;
 
-        .section-label {
-          font-size: 0.875rem;
-          font-weight: 600;
-          color: var(--color-text-secondary);
-        }
-
         .category-chips-grid {
           display: flex;
           flex-wrap: wrap;
@@ -171,26 +181,24 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
         display: none;
       }
 
-      .photo-upload-placeholder {
-        height: 120px;
-        border: 2px dashed #cbd5e1;
-        border-radius: var(--radius-lg);
-        background-color: #f8fafc;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        color: var(--color-text-muted);
-        font-size: 0.875rem;
-        font-weight: 500;
-        cursor: pointer;
-        transition: all var(--transition-fast);
-
-        &:hover {
-          border-color: var(--color-primary);
-          background-color: #eff6ff;
-          color: var(--color-primary);
+      .section-label { font-size: .875rem; font-weight: 600; color: var(--color-text-secondary); }
+      .photo-actions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
+        gap: .5rem;
+        .btn { padding-inline: .625rem; }
+      }
+      .camera-panel {
+        display: grid;
+        gap: .5rem;
+        video {
+          display: block;
+          width: 100%;
+          aspect-ratio: 4 / 3;
+          max-height: 18rem;
+          border-radius: var(--radius-md);
+          background-color: var(--color-text-primary);
+          object-fit: contain;
         }
       }
 
@@ -243,6 +251,12 @@ export class ReportProblemComponent implements OnInit {
   readonly categoryError = signal('');
   readonly photoError = signal('');
   readonly photoPreview = signal<string | null>(null);
+  readonly cameraOpen = signal(false);
+  readonly cameraReady = signal(false);
+  readonly capturing = signal(false);
+  private readonly cameraStream = signal<MediaStream | null>(null);
+  private readonly cameraVideo = viewChild<ElementRef<HTMLVideoElement>>('cameraVideo');
+  private cameraRequest = 0;
   selectedFile: File | null = null;
 
   reportForm: FormGroup = this.fb.group({
@@ -250,6 +264,14 @@ export class ReportProblemComponent implements OnInit {
     description: ['', Validators.maxLength(2000)],
     accessTime: ['', Validators.maxLength(100)]
   });
+
+  constructor() {
+    effect(() => {
+      const video = this.cameraVideo()?.nativeElement;
+      if (video) video.srcObject = this.cameraStream();
+    });
+    this.destroy.onDestroy(() => this.closeCamera());
+  }
 
   ngOnInit(): void {
     this.title.setTitle('Report Problem | FixFlow');
@@ -293,27 +315,83 @@ export class ReportProblemComponent implements OnInit {
   onFileSelected(event: Event): void {
     const input = event.target as HTMLInputElement;
     const selected = input.files?.[0];
-    if (selected) {
-      if (!selected.type.startsWith("image/") || selected.size > 5 * 1024 * 1024) {
-        this.clearPhoto();
-        this.photoError.set('Choose an image that is 5 MB or smaller.');
-        input.value = "";
-        return;
-      }
-      this.photoError.set('');
-      this.photoPreview.set(null);
-      this.selectedFile = selected;
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        if (this.selectedFile === selected) this.photoPreview.set(e.target?.result as string);
-      };
-      reader.onerror = () => {
-        if (this.selectedFile !== selected) return;
-        this.clearPhoto();
-        this.photoError.set('Could not read this image.');
-      };
-      reader.readAsDataURL(selected);
+    input.value = '';
+    if (selected) this.setPhoto(selected);
+  }
+
+  async openCamera(nativeInput: HTMLInputElement): Promise<void> {
+    this.photoError.set('');
+    if (!navigator.mediaDevices?.getUserMedia) {
+      nativeInput.click();
+      return;
     }
+    const request = ++this.cameraRequest;
+    this.cameraOpen.set(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' } } });
+      if (request === this.cameraRequest) this.cameraStream.set(stream);
+      else stream.getTracks().forEach(track => track.stop());
+    } catch {
+      if (request !== this.cameraRequest) return;
+      this.closeCamera();
+      this.photoError.set('Could not open the camera. Check camera permissions or choose a photo from your gallery.');
+    }
+  }
+
+  closeCamera(): void {
+    this.cameraRequest++;
+    this.cameraStream()?.getTracks().forEach(track => track.stop());
+    this.cameraStream.set(null);
+    this.cameraReady.set(false);
+    this.cameraOpen.set(false);
+    this.capturing.set(false);
+  }
+
+  capturePhoto(): void {
+    const video = this.cameraVideo()?.nativeElement;
+    if (!video?.videoWidth || !video.videoHeight || this.capturing()) return;
+    const frame = document.createElement('canvas');
+    const scale = Math.min(1, 1600 / Math.max(video.videoWidth, video.videoHeight));
+    frame.width = Math.max(1, Math.round(video.videoWidth * scale));
+    frame.height = Math.max(1, Math.round(video.videoHeight * scale));
+    const context = frame.getContext('2d');
+    if (!context) {
+      this.photoError.set('Could not capture the photo. Try again or choose a photo from your gallery.');
+      return;
+    }
+    context.drawImage(video, 0, 0, frame.width, frame.height);
+    const request = this.cameraRequest;
+    this.capturing.set(true);
+    frame.toBlob(blob => {
+      if (request !== this.cameraRequest) return;
+      this.capturing.set(false);
+      if (blob) {
+        this.closeCamera();
+        this.setPhoto(new File([blob], 'report-photo.jpg', { type: 'image/jpeg' }));
+      } else {
+        this.photoError.set('Could not capture the photo. Try again or choose a photo from your gallery.');
+      }
+    }, 'image/jpeg', .85);
+  }
+
+  private setPhoto(selected: File): void {
+    if (!selected.type.startsWith('image/') || selected.size > 5 * 1024 * 1024) {
+      this.photoError.set('Choose an image that is 5 MB or smaller.');
+      return;
+    }
+    this.photoError.set('');
+    this.photoPreview.set(null);
+    this.selectedFile = selected;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (this.selectedFile === selected && typeof reader.result === 'string') this.photoPreview.set(reader.result);
+    };
+    reader.onerror = () => {
+      if (this.selectedFile !== selected) return;
+      this.clearPhoto();
+      this.photoError.set('Could not read this image.');
+    };
+    reader.readAsDataURL(selected);
   }
 
   clearPhoto(): void {
@@ -323,6 +401,7 @@ export class ReportProblemComponent implements OnInit {
   }
 
   onSubmit(): void {
+    if (this.cameraOpen()) return;
     if (this.reportForm.valid && (this.selectedFile ? this.photoPreview() : this.reportForm.value.description?.trim())) {
       const category = this.categories().find(item => item.id === this.reportForm.value.categoryId);
       if (!category) return;

@@ -16,6 +16,7 @@ from app.controllers import request_controller
 from app.database import models as m
 from app.database.session import Base, get_db
 from app.middlewares.security import create_access_token, get_password_hash
+from app.model_handle.image_model.model_loader import ImageModelLoader
 from app.routes.auth_routes import attempts
 from app.model_handle.llama_model.repair_guidance import RepairGuidance
 
@@ -80,12 +81,13 @@ def database(tmp_path, monkeypatch, password_hash):
 
 
 @pytest.fixture
-def client(database):
+def client(database, monkeypatch):
     def test_session():
         with database() as db:
             yield db
 
     attempts.clear()
+    monkeypatch.setattr(ImageModelLoader, "validate_startup", lambda preload: None)
     main.app.dependency_overrides[get_db] = test_session
     with TestClient(main.app) as http:
         yield http

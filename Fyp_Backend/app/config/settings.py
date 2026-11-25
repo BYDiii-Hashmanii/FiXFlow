@@ -30,6 +30,7 @@ class Settings(BaseSettings):
     OLLAMA_MODEL_NAME: str = "fixflow"
     PRELOAD_IMAGE_MODEL: bool = True
     IMAGE_TIMEOUT_SECONDS: float = Field(default=45, gt=0, le=60)
+    DETECTION_CONFIDENCE_THRESHOLD: float = Field(default=0.5, gt=0, le=1)
     CHAT_TIMEOUT_SECONDS: float = Field(default=15, gt=0, le=60)
     GUIDANCE_TIMEOUT_SECONDS: float = Field(default=45, gt=0, le=120)
 

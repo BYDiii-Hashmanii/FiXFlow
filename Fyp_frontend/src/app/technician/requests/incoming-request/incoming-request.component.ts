@@ -85,6 +85,9 @@ type RequestState = { request?: JobRequest; loading?: boolean; unavailable?: boo
               <div class="description-section">
                 <h4 class="section-label">Problem description</h4>
                 <p class="description-text">{{ request.description }}</p>
+                @if (request.detectedDisplayName) {
+                  <p class="description-text">Detected: {{ request.detectedDisplayName }} ({{ request.detectionConfidence | percent }})</p>
+                }
               </div>
 
               <div class="specs-grid">

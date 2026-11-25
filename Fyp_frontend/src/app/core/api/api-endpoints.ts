@@ -19,6 +19,7 @@ export const API = {
     create: '/requests',
     byId: (id: number | string) => `/requests/${id}`,
     analysis: (id: number | string) => `/requests/${id}/analysis`,
+    category: (id: number | string) => `/requests/${id}/category`,
     markSolved: (id: number | string) => `/requests/${id}/solved`,
     autoSelect: (id: number | string) => `/requests/${id}/auto-select`,
     sendOffer: (id: number | string) => `/requests/${id}/offers`,

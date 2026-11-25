@@ -14,6 +14,8 @@ interface OfferCard {
   title: string | null;
   description: string | null;
   category: string;
+  detectedDisplayName: string | null;
+  detectionConfidence: number | null;
   accessTime: string | null;
   photoUrl: string | null;
   customer: { name: string; phone: string | null; address: string | null; avatarInitials: string };
@@ -37,6 +39,7 @@ function requestFromOffer(offer: OfferCard): JobRequest {
   return {
     id: offer.requestId, offerId: offer.id, title: offer.title ?? '', description: offer.description ?? '',
     category: offer.category, accessTime: offer.accessTime ?? '', photoUrl: offer.photoUrl ?? '',
+    detectedDisplayName: offer.detectedDisplayName, detectionConfidence: offer.detectionConfidence,
     customer: { ...offer.customer, phone: offer.customer.phone ?? '', address: offer.customer.address ?? '', distance: '' },
     urgency: offer.urgency === 'high' ? 'High urgency' : offer.urgency === 'medium' ? 'Medium urgency' : offer.urgency === 'low' ? 'Low' : '',
     estimatedPay: offer.offeredPrice, status: offer.status, createdAt: offer.createdAt,

@@ -119,7 +119,7 @@ class ServiceCategory(Base):
     name = Column(String(50), nullable=False, unique=True)
 
     technicians = relationship("Technician", back_populates="category")
-    requests = relationship("ServiceRequest", back_populates="category")
+    requests = relationship("ServiceRequest", back_populates="category", foreign_keys="ServiceRequest.category_id")
 
 
 class Technician(Base):
@@ -147,6 +147,9 @@ class ServiceRequest(Base):
     request_no = Column(String(20), nullable=False, unique=True, index=True)
     customer_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     category_id = Column(Integer, ForeignKey("service_categories.id"), nullable=False)
+    final_category_id = Column(Integer, ForeignKey("service_categories.id"), nullable=True)
+    detected_category_id = Column(Integer, ForeignKey("service_categories.id"), nullable=True)
+    suggested_category_id = Column(Integer, ForeignKey("service_categories.id"), nullable=True)
     title = Column(String(120), nullable=True)
     description = Column(Text, nullable=True)
     photo_path = Column(String(255), nullable=True)
@@ -158,6 +161,11 @@ class ServiceRequest(Base):
     analysis_confidence = Column(Numeric(5, 4), nullable=True)
     detector_label = Column(String(120), nullable=True)
     detected_category = Column(String(80), nullable=True)
+    detected_display_name = Column(String(120), nullable=True)
+    category_source = Column(String(16), nullable=True)
+    safety_critical = Column(Boolean, nullable=True)
+    diy_allowed = Column(Boolean, nullable=True)
+    decision_safety_note = Column(Text, nullable=True)
     address = Column(String(255), nullable=True)
     access_time = Column(String(100), nullable=True)
     urgency = Column(SQLEnum(UrgencyLevel, create_constraint=True), nullable=True)
@@ -168,7 +176,18 @@ class ServiceRequest(Base):
     updated_at = Column(DateTime, nullable=False, default=utc_now, onupdate=utc_now)
 
     customer = relationship("User", back_populates="requests", foreign_keys=[customer_id])
-    category = relationship("ServiceCategory", back_populates="requests")
+    category = relationship("ServiceCategory", back_populates="requests", foreign_keys=[category_id])
+    final_category = relationship("ServiceCategory", foreign_keys=[final_category_id])
+    detected_service_category = relationship("ServiceCategory", foreign_keys=[detected_category_id])
+    suggested_category = relationship("ServiceCategory", foreign_keys=[suggested_category_id])
+
+    @property
+    def effective_category_id(self) -> int:
+        return self.final_category_id if self.final_category_id is not None else self.category_id
+
+    @property
+    def effective_category(self) -> "ServiceCategory":
+        return self.final_category or self.category
     assigned_technician = relationship("Technician", back_populates="assigned_requests", foreign_keys=[assigned_technician_id])
     ai_analysis = relationship("AiAnalysis", back_populates="request", uselist=False, cascade="all, delete-orphan")
     offers = relationship("RequestOffer", back_populates="request", cascade="all, delete-orphan")

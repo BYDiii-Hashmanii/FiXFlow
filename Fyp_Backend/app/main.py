@@ -12,6 +12,7 @@ from app.config.settings import settings
 from app.database.seed import init_db
 from app.database.migrations import migrate
 from app.database.session import engine
+from app.model_handle.image_model.label_map import LabelMapError
 from app.routes.auth_routes import router as auth_router
 from app.routes.category_routes import router as category_router
 from app.routes.chat_routes import router as chat_router
@@ -34,13 +35,14 @@ async def lifespan(app: FastAPI):
     migrate(engine)
     if settings.SEED_DEMO:
         init_db()
-    if settings.PRELOAD_IMAGE_MODEL:
+    try:
         from app.model_handle.image_model.model_loader import ImageModelLoader
 
-        try:
-            ImageModelLoader.get_model()
-        except Exception:
-            logger.warning("Image model unavailable on startup", exc_info=True)
+        ImageModelLoader.validate_startup(settings.PRELOAD_IMAGE_MODEL)
+    except LabelMapError:
+        raise
+    except Exception:
+        logger.warning("Image model unavailable on startup", exc_info=True)
     yield
 
 

@@ -59,7 +59,26 @@ def add_analysis_progress(conn) -> None:
             conn.exec_driver_sql(f"ALTER TABLE service_requests ADD COLUMN {name} {definition}")
 
 
-MIGRATIONS = ((1, rebuild_with_checks), (2, add_analysis_state), (3, add_list_indexes), (4, add_analysis_progress))
+def add_label_decisions(conn) -> None:
+    columns = {row[1] for row in conn.exec_driver_sql("PRAGMA table_info(service_requests)")}
+    for name, definition in {
+        "final_category_id": "INTEGER REFERENCES service_categories(id)",
+        "detected_category_id": "INTEGER REFERENCES service_categories(id)",
+        "suggested_category_id": "INTEGER REFERENCES service_categories(id)",
+        "detected_display_name": "VARCHAR(120)",
+        "category_source": "VARCHAR(16)",
+        "safety_critical": "BOOLEAN",
+        "diy_allowed": "BOOLEAN",
+        "decision_safety_note": "TEXT",
+    }.items():
+        if name not in columns:
+            conn.exec_driver_sql(f"ALTER TABLE service_requests ADD COLUMN {name} {definition}")
+
+
+MIGRATIONS = (
+    (1, rebuild_with_checks), (2, add_analysis_state), (3, add_list_indexes),
+    (4, add_analysis_progress), (5, add_label_decisions),
+)
 
 
 def migrate(database: Engine = engine) -> None:

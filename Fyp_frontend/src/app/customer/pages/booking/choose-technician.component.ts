@@ -3,7 +3,7 @@ import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { HeaderService } from '../../../core/services/header.service';
-import { forkJoin, switchMap, tap } from 'rxjs';
+import { EMPTY, forkJoin, switchMap, tap } from 'rxjs';
 import { errorMessage } from '../../../core/interceptors/error.interceptor';
 import { ServiceRequest, TechnicianInfo } from '../../models/customer.models';
 import { JobTrackingService } from '../../services/job-tracking.service';
@@ -82,12 +82,18 @@ export class ChooseTechnicianComponent implements OnInit {
     this.loading.set(true);
     this.requests.getById(id).pipe(
       tap(request => this.request.set(request)),
-      switchMap(request => forkJoin([
-        this.api.list(this.categoryOnly() || this.bestMatch() ? request.categoryId : undefined, {
-          available: this.availableOnly(), bestMatch: this.bestMatch(),
-        }),
-        this.tracking.trackJob(id),
-      ])),
+      switchMap(request => {
+        if (request.categoryChoiceRequired || request.aiAnalysis?.state === 'pending') {
+          void this.router.navigate(['/customer/booking', id, 'options'], { replaceUrl: true });
+          return EMPTY;
+        }
+        return forkJoin([
+          this.api.list(this.categoryOnly() || this.bestMatch() ? request.categoryId : undefined, {
+            available: this.availableOnly(), bestMatch: this.bestMatch(),
+          }),
+          this.tracking.trackJob(id),
+        ]);
+      }),
       takeUntilDestroyed(this.destroy),
     ).subscribe({
       next: ([people, tracked]) => {

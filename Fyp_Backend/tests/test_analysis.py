@@ -5,7 +5,7 @@ from app.database import models as m
 from test_contracts import image
 
 
-@pytest.mark.parametrize("outcome", ["ready", "no_detection", "failed"])
+@pytest.mark.parametrize("outcome", ["ready", "uncertain", "no_detection", "failed"])
 def test_analysis_is_separate_from_request_and_booking(client, prefix, auth, database, monkeypatch, outcome):
     def predict(path):
         with database() as db:
@@ -15,12 +15,7 @@ def test_analysis_is_separate_from_request_and_booking(client, prefix, auth, dat
             raise RuntimeError("Synthetic inference failure")
         if outcome == "no_detection":
             return {"primary_issue": None, "confidence": 0, "analysis": None}
-        return {
-            "primary_issue": "fixture", "confidence": 0.82,
-            "analysis": {"title": "Fixture result", "category": "Plumbing", "urgency": "low",
-                         "summary": "Test result", "safety_note": "",
-                         "steps": [{"step_no": 1, "instruction": "Check the fixture"}]},
-        }
+        return {"primary_issue": "waste_tap", "confidence": 0.82 if outcome == "ready" else 0.31}
 
     monkeypatch.setattr(request_controller, "analyze_file", predict)
     original = request_controller.generate_repair_guidance
@@ -31,6 +26,9 @@ def test_analysis_is_separate_from_request_and_booking(client, prefix, auth, dat
             assert req.analysis_stage == "guidance"
             assert req.vision_state == outcome
         assert detection["state"] == outcome
+        assert detection["label"] == ("waste_tap" if outcome == "ready" else None)
+        if outcome == "ready":
+            assert detection["confidence"] == 0.82 and "washer" in detection["hint"]
         return original(description, category, detection)
 
     monkeypatch.setattr(request_controller, "generate_repair_guidance", generate)
@@ -44,6 +42,8 @@ def test_analysis_is_separate_from_request_and_booking(client, prefix, auth, dat
     result = client.get(endpoint + "/analysis", headers=customer).json()["data"]
     assert result["state"] == "ready"
     assert result["visionState"] == outcome
+    assert result["categorySource"] == ("confirmed" if outcome == "ready" else "customer")
+    assert result["finalCategoryId"] == 1 and result["diyAllowed"] and not result["safetyCritical"]
     assert result["provenance"] == ("yolo+llama" if outcome == "ready" else "llama")
     assert result["steps"][0]["instruction"] == "Check options"
     assert client.post(endpoint + "/auto-select", headers=customer).json()["data"]["id"] == "3"

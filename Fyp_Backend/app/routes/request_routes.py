@@ -5,11 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.api.schemas.common_schemas import ApiResponse
 from app.api.schemas.pagination import Pagination
-from app.api.schemas.workflow_schemas import CreateOffer
+from app.api.schemas.workflow_schemas import ChooseRequestCategory, CreateOffer
 from app.controllers.invoice_controller import InvoiceController
 from app.controllers.lifecycle import finish_request_early
 from app.controllers.offer_controller import OfferController
-from app.controllers.request_controller import RequestController, analyze_request, format_analysis, format_request_response
+from app.controllers.request_controller import RequestController, analyze_request, complete_guidance, format_analysis, format_request_response
 from app.database import models as m
 from app.database.repositories.access import invoice_record, request_record, request_scope
 from app.database.session import get_db
@@ -47,6 +47,15 @@ def list_requests(
 @router.get("/requests/{id}", response_model=ApiResponse[dict])
 def get_request(id: str, user: m.User = Depends(get_current_user), db: Session = Depends(get_db)):
     return ApiResponse.wrap(format_request_response(request_record(db, user, id)))
+
+
+@router.patch("/requests/{id}/category", response_model=ApiResponse[dict])
+def change_category(id: str, payload: ChooseRequestCategory, background: BackgroundTasks,
+                    user: m.User = Depends(customer_only), db: Session = Depends(get_db)):
+    req = request_record(db, user, id)
+    if RequestController(db).change_category(req, payload.categoryId):
+        background.add_task(complete_guidance, db.get_bind(), req.id)
+    return ApiResponse.wrap(format_request_response(req))
 
 
 @router.get("/requests/{id}/analysis", response_model=ApiResponse[dict])

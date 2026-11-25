@@ -17,7 +17,7 @@ import { AiAnalysisService } from '../../services/ai-analysis.service';
       @if (analysis(); as result) {
         <article class="card repair-panel repair-summary">
           <h1>{{ result.title || 'Repair steps' }}</h1>
-          @if (result.state === 'ready' && result.steps.length) {
+          @if (result.state === 'ready' && result.diyAllowed !== false && result.steps.length) {
             <p>Check off each step as you go.</p>
             <div class="repair-progress">
               <label for="repair-progress" aria-live="polite">{{ completed().length }} of {{ result.steps.length }} steps complete</label>
@@ -25,7 +25,7 @@ import { AiAnalysisService } from '../../services/ai-analysis.service';
             </div>
           }
         </article>
-        @if (result.state === 'ready' && result.steps.length) {
+        @if (result.state === 'ready' && result.diyAllowed !== false && result.steps.length) {
           <section class="card repair-panel repair-instructions" aria-labelledby="repair-checklist-title">
             <h2 id="repair-checklist-title">Repair checklist</h2>
             <ol class="repair-step-list repair-step-controls">
@@ -52,7 +52,7 @@ import { AiAnalysisService } from '../../services/ai-analysis.service';
         }
       } @else if (!failure()) { <p role="status">Loading repair steps…</p> }
       <div class="repair-actions repair-finish-actions">
-        @if (analysis()?.state === 'ready' && analysis()?.steps?.length) {
+        @if (analysis()?.state === 'ready' && analysis()?.diyAllowed !== false && analysis()?.steps?.length) {
           <button class="btn btn-primary" [disabled]="pending()" (click)="solve()">
             <app-icon name="check" size="sm" aria-hidden="true" /> {{ pending() ? 'Saving…' : 'Mark as Solved' }}
           </button>
@@ -92,7 +92,8 @@ export class TryStepsComponent implements OnInit {
   }
 
   solve(): void {
-    if (!this.id || this.pending()) return;
+    const analysis = this.analysis();
+    if (!this.id || this.pending() || analysis?.state !== 'ready' || analysis.diyAllowed === false || !analysis.steps.length) return;
     this.pending.set(true);
     this.failure.set('');
     this.api.markSolved(this.id).pipe(finalize(() => this.pending.set(false))).subscribe({

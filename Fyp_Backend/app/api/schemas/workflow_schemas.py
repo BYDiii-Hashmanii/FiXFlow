@@ -19,6 +19,10 @@ class CreateOffer(RequestBody):
     technicianId: ID
 
 
+class ChooseRequestCategory(RequestBody):
+    categoryId: ID
+
+
 class DeclineOffer(RequestBody):
     reason: DeclineReason
 

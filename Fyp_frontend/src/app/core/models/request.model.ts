@@ -19,6 +19,8 @@ export interface JobRequest {
   customer: CustomerInfo;
   accessTime: string;
   description: string;
+  detectedDisplayName?: string | null;
+  detectionConfidence?: number | null;
   estimatedPay: number;
   photoUrl: string;
   status: RequestStatus;

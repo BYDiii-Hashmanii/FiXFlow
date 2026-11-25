@@ -33,7 +33,7 @@ def format_job_response(job: m.Job) -> dict:
         "id": req.request_no,
         "requestId": req.request_no,
         "title": req.title,
-        "category": req.category.name,
+        "category": req.effective_category.name,
         "customer": {
             "name": customer.full_name, "phone": customer.phone, "address": req.address,
             "avatarInitials": get_initials(customer.full_name),
